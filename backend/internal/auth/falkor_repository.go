@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/THARUN-BART/whyline/backend/internal/graph"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type FalkorRepository struct {
@@ -27,75 +25,8 @@ func NewFalkorRepository(client *graph.Client, graphName string) *FalkorReposito
 }
 
 func (r *FalkorRepository) seedDefaults() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-
-	defaultUsers := []*User{
-		{
-			ID:           "usr_demo",
-			Email:        "demo@whyline.dev",
-			Username:     "demo",
-			Company:      "Whyline Corp",
-			PasswordHash: string(hashedPassword),
-			Role:         "admin",
-			IsVerified:   true,
-			CreatedAt:    time.Now().UTC(),
-		},
-		{
-			ID:           "usr_alice",
-			Email:        "alice@whyline.dev",
-			Username:     "alice",
-			Company:      "Acme Technologies",
-			PasswordHash: string(hashedPassword),
-			Role:         "engineer",
-			IsVerified:   true,
-			CreatedAt:    time.Now().UTC(),
-		},
-		{
-			ID:           "usr_bob",
-			Email:        "bob@whyline.dev",
-			Username:     "bob",
-			Company:      "Acme Technologies",
-			PasswordHash: string(hashedPassword),
-			Role:         "product_manager",
-			IsVerified:   true,
-			CreatedAt:    time.Now().UTC(),
-		},
-	}
-
-	for _, u := range defaultUsers {
-		// Use MERGE so it's idempotent and doesn't duplicate on restart
-		cypher := `
-MERGE (u:User {email: $email})
-ON CREATE SET 
-	u.id = $id,
-	u.username = $username,
-	u.password_hash = $password_hash,
-	u.role = $role,
-	u.is_verified = $is_verified,
-	u.created_at = $created_at
-SET u.company = $company
-WITH u
-MERGE (c:Company {name: $company})
-MERGE (u)-[:BELONGS_TO]->(c)
-`
-		params := map[string]interface{}{
-			"id":            u.ID,
-			"email":         strings.ToLower(u.Email),
-			"username":      strings.ToLower(u.Username),
-			"company":       u.Company,
-			"password_hash": u.PasswordHash,
-			"role":          u.Role,
-			"is_verified":   u.IsVerified,
-			"created_at":    u.CreatedAt.Format(time.RFC3339),
-		}
-		_, err := r.client.Query(ctx, r.graphName, cypher, params)
-		if err != nil {
-			log.Printf("[WARN] Failed to seed default user %s into FalkorDB: %v", u.Email, err)
-		}
-	}
+	// No hardcoded users or credentials in the code.
+	// Platform administrators and users are managed and inserted directly into FalkorDB.
 }
 
 func (r *FalkorRepository) Create(user *User) error {
@@ -123,6 +54,7 @@ CREATE (u:User {
 	company: $company,
 	password_hash: $password_hash,
 	role: $role,
+	approval_status: $approval_status,
 	is_verified: $is_verified,
 	created_at: $created_at
 })
@@ -130,15 +62,21 @@ WITH u
 MERGE (c:Company {name: $company})
 MERGE (u)-[:BELONGS_TO]->(c)
 `
+	approvalStatus := user.ApprovalStatus
+	if approvalStatus == "" {
+		approvalStatus = "approved"
+	}
+
 	params := map[string]interface{}{
-		"id":            user.ID,
-		"email":         normEmail,
-		"username":      normUsername,
-		"company":       user.Company,
-		"password_hash": user.PasswordHash,
-		"role":          user.Role,
-		"is_verified":   user.IsVerified,
-		"created_at":    user.CreatedAt.Format(time.RFC3339),
+		"id":              user.ID,
+		"email":           normEmail,
+		"username":        normUsername,
+		"company":         user.Company,
+		"password_hash":   user.PasswordHash,
+		"role":            user.Role,
+		"approval_status": approvalStatus,
+		"is_verified":     user.IsVerified,
+		"created_at":      user.CreatedAt.Format(time.RFC3339),
 	}
 
 	_, err = r.client.Query(ctx, r.graphName, createCypher, params)
@@ -154,7 +92,7 @@ func (r *FalkorRepository) FindByEmail(email string) (*User, error) {
 	defer cancel()
 
 	normEmail := strings.ToLower(strings.TrimSpace(email))
-	cypher := "MATCH (u:User {email: $email}) RETURN u"
+	cypher := "MATCH (u:User) WHERE toLower(u.email) = $email OR toLower(u.username) = $email RETURN u LIMIT 1"
 	res, err := r.client.ROQuery(ctx, r.graphName, cypher, map[string]interface{}{
 		"email": normEmail,
 	})
@@ -169,7 +107,7 @@ func (r *FalkorRepository) FindByID(id string) (*User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cypher := "MATCH (u:User {id: $id}) RETURN u"
+	cypher := "MATCH (u:User) WHERE u.id = $id OR toLower(u.email) = toLower($id) OR toLower(u.username) = toLower($id) OR 'usr_' + replace(toLower(u.email), '@', '_') = toLower($id) RETURN u LIMIT 1"
 	res, err := r.client.ROQuery(ctx, r.graphName, cypher, map[string]interface{}{
 		"id": id,
 	})
@@ -185,7 +123,7 @@ func (r *FalkorRepository) FindByUsername(username string) (*User, error) {
 	defer cancel()
 
 	norm := strings.ToLower(strings.TrimSpace(username))
-	cypher := "MATCH (u:User {username: $username}) RETURN u"
+	cypher := "MATCH (u:User) WHERE toLower(u.username) = $username OR toLower(u.email) = $username RETURN u LIMIT 1"
 	res, err := r.client.ROQuery(ctx, r.graphName, cypher, map[string]interface{}{
 		"username": norm,
 	})
@@ -217,17 +155,50 @@ func (r *FalkorRepository) ListAll() []*User {
 
 func nodeToUser(node graph.Node) (*User, error) {
 	props := node.Properties
-	id, _ := props["id"].(string)
 	email, _ := props["email"].(string)
 	username, _ := props["username"].(string)
+
+	if email == "" && username != "" {
+		email = username
+	}
+	if username == "" && email != "" {
+		username = email
+	}
+
+	if email == "" && username == "" {
+		return nil, ErrUserNotFound
+	}
+
+	id, _ := props["id"].(string)
+	if id == "" {
+		id = "usr_" + strings.ToLower(strings.ReplaceAll(email, "@", "_"))
+	}
+
 	company, _ := props["company"].(string)
 	if company == "" {
-		company = "Whyline Corp"
+		company = "Whyline"
 	}
-	pwdHash, _ := props["password_hash"].(string)
-	role, _ := props["role"].(string)
 
-	isVerified := false
+	pwdHash, _ := props["password_hash"].(string)
+	if pwdHash == "" {
+		pwdHash, _ = props["password"].(string)
+	}
+
+	role, _ := props["role"].(string)
+	if role == "" {
+		if strings.Contains(strings.ToLower(username), "admin") || strings.Contains(strings.ToLower(email), "admin") {
+			role = "admin"
+		} else {
+			role = "user"
+		}
+	}
+
+	approvalStatus, _ := props["approval_status"].(string)
+	if approvalStatus == "" {
+		approvalStatus = "approved"
+	}
+
+	isVerified := true
 	if v, ok := props["is_verified"].(bool); ok {
 		isVerified = v
 	}
@@ -239,19 +210,16 @@ func nodeToUser(node graph.Node) (*User, error) {
 		}
 	}
 
-	if id == "" || email == "" {
-		return nil, ErrUserNotFound
-	}
-
 	return &User{
-		ID:           id,
-		Email:        email,
-		Username:     username,
-		Company:      company,
-		PasswordHash: pwdHash,
-		Role:         role,
-		IsVerified:   isVerified,
-		CreatedAt:    createdAt,
+		ID:             id,
+		Email:          email,
+		Username:       username,
+		Company:        company,
+		PasswordHash:   pwdHash,
+		Role:           role,
+		ApprovalStatus: approvalStatus,
+		IsVerified:     isVerified,
+		CreatedAt:      createdAt,
 	}, nil
 }
 
@@ -306,7 +274,8 @@ func (r *FalkorRepository) ListCompanies() ([]*Company, error) {
 
 	cypher := `
 MATCH (c:Company)
-RETURN c.id AS id, c.name AS name, c.created_at AS created_at
+OPTIONAL MATCH (u:User) WHERE toLower(u.company) = toLower(c.name)
+RETURN c.id AS id, c.name AS name, c.created_at AS created_at, count(u) AS user_count
 `
 	res, err := r.client.ROQuery(ctx, r.graphName, cypher, nil)
 	if err != nil {
@@ -329,13 +298,46 @@ RETURN c.id AS id, c.name AS name, c.created_at AS created_at
 				createdAt = parsed
 			}
 		}
+
+		userCount := 0
+		if uc, ok := rec["user_count"].(float64); ok {
+			userCount = int(uc)
+		} else if uc, ok := rec["user_count"].(int64); ok {
+			userCount = int(uc)
+		} else if uc, ok := rec["user_count"].(int); ok {
+			userCount = uc
+		}
+
 		companies = append(companies, &Company{
 			ID:        id,
 			Name:      name,
+			UserCount: userCount,
 			CreatedAt: createdAt,
 		})
 	}
 	return companies, nil
+}
+
+func (r *FalkorRepository) GetCompanyStats(companyName string) (*CompanyStats, error) {
+	users, err := r.ListUsersByCompany(companyName, "")
+	if err != nil {
+		return nil, err
+	}
+	stats := &CompanyStats{
+		Company:   companyName,
+		UserCount: len(users),
+	}
+	for _, u := range users {
+		switch strings.ToLower(strings.TrimSpace(u.ApprovalStatus)) {
+		case "approved":
+			stats.ApprovedCount++
+		case "pending":
+			stats.PendingCount++
+		case "rejected":
+			stats.RejectedCount++
+		}
+	}
+	return stats, nil
 }
 
 func (r *FalkorRepository) CompanyExists(name string) (bool, error) {
@@ -356,4 +358,69 @@ LIMIT 1
 		return false, err
 	}
 	return len(res.Records) > 0, nil
+}
+
+func (r *FalkorRepository) UpdateApprovalStatus(userID string, status string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cypher := `
+MATCH (u:User {id: $id})
+SET u.approval_status = $status
+RETURN u.id AS id
+`
+	res, err := r.client.Query(ctx, r.graphName, cypher, map[string]interface{}{
+		"id":     userID,
+		"status": status,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update user approval status: %w", err)
+	}
+	if len(res.Records) == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *FalkorRepository) ListUsersByCompany(companyName string, approvalStatus string) ([]*User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	normCompany := strings.ToLower(strings.TrimSpace(companyName))
+	var cypher string
+	var params map[string]interface{}
+
+	if approvalStatus != "" {
+		cypher = `
+MATCH (u:User)
+WHERE toLower(u.company) = $company AND toLower(u.approval_status) = $status
+RETURN u
+`
+		params = map[string]interface{}{
+			"company": normCompany,
+			"status":  strings.ToLower(approvalStatus),
+		}
+	} else {
+		cypher = `
+MATCH (u:User)
+WHERE toLower(u.company) = $company
+RETURN u
+`
+		params = map[string]interface{}{
+			"company": normCompany,
+		}
+	}
+
+	res, err := r.client.ROQuery(ctx, r.graphName, cypher, params)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []*User
+	for _, n := range res.Nodes {
+		if u, err := nodeToUser(n); err == nil {
+			users = append(users, u)
+		}
+	}
+	return users, nil
 }

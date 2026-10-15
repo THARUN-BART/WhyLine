@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -21,11 +19,14 @@ type Repository interface {
 	FindByID(id string) (*User, error)
 	FindByUsername(username string) (*User, error)
 	ListAll() []*User
+	UpdateApprovalStatus(userID string, status string) error
+	ListUsersByCompany(companyName string, approvalStatus string) ([]*User, error)
 
 	// Company operations (Admin managed)
 	CreateCompany(name string) (*Company, error)
 	ListCompanies() ([]*Company, error)
 	CompanyExists(name string) (bool, error)
+	GetCompanyStats(companyName string) (*CompanyStats, error)
 }
 
 type MemoryRepository struct {
@@ -48,45 +49,16 @@ func NewMemoryRepository() *MemoryRepository {
 }
 
 func (r *MemoryRepository) seedDefaults() {
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-
-	defaultUsers := []*User{
-		{
-			ID:           "usr_demo",
-			Email:        "demo@whyline.dev",
-			Username:     "demo",
-			Company:      "Whyline Corp",
-			PasswordHash: string(hashedPassword),
-			Role:         "admin",
-			CreatedAt:    time.Now().UTC(),
-		},
-		{
-			ID:           "usr_alice",
-			Email:        "alice@whyline.dev",
-			Username:     "alice",
-			Company:      "Acme Technologies",
-			PasswordHash: string(hashedPassword),
-			Role:         "engineer",
-			CreatedAt:    time.Now().UTC(),
-		},
-		{
-			ID:           "usr_bob",
-			Email:        "bob@whyline.dev",
-			Username:     "bob",
-			Company:      "Acme Technologies",
-			PasswordHash: string(hashedPassword),
-			Role:         "product_manager",
-			CreatedAt:    time.Now().UTC(),
-		},
-	}
-
-	for _, u := range defaultUsers {
-		_ = r.Create(u)
-	}
+	// Seed default organizations (users and admins are created dynamically or in FalkorDB)
 
 	// Seed default organizations
-	r.companies["whyline corp"] = &Company{
+	r.companies["whyline"] = &Company{
 		ID:        "comp_whyline",
+		Name:      "Whyline",
+		CreatedAt: time.Now().UTC(),
+	}
+	r.companies["whyline corp"] = &Company{
+		ID:        "comp_whyline_corp",
 		Name:      "Whyline Corp",
 		CreatedAt: time.Now().UTC(),
 	}
@@ -204,9 +176,43 @@ func (r *MemoryRepository) ListCompanies() ([]*Company, error) {
 
 	var list []*Company
 	for _, c := range r.companies {
-		list = append(list, c)
+		normComp := strings.ToLower(strings.TrimSpace(c.Name))
+		cnt := 0
+		for _, u := range r.users {
+			if strings.ToLower(strings.TrimSpace(u.Company)) == normComp {
+				cnt++
+			}
+		}
+		cCopy := *c
+		cCopy.UserCount = cnt
+		list = append(list, &cCopy)
 	}
 	return list, nil
+}
+
+func (r *MemoryRepository) GetCompanyStats(companyName string) (*CompanyStats, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	normComp := strings.ToLower(strings.TrimSpace(companyName))
+	stats := &CompanyStats{
+		Company: companyName,
+	}
+
+	for _, u := range r.users {
+		if strings.ToLower(strings.TrimSpace(u.Company)) == normComp {
+			stats.UserCount++
+			switch strings.ToLower(strings.TrimSpace(u.ApprovalStatus)) {
+			case "approved":
+				stats.ApprovedCount++
+			case "pending":
+				stats.PendingCount++
+			case "rejected":
+				stats.RejectedCount++
+			}
+		}
+	}
+	return stats, nil
 }
 
 func (r *MemoryRepository) CompanyExists(name string) (bool, error) {
@@ -216,4 +222,32 @@ func (r *MemoryRepository) CompanyExists(name string) (bool, error) {
 	norm := strings.ToLower(strings.TrimSpace(name))
 	_, exists := r.companies[norm]
 	return exists, nil
+}
+
+func (r *MemoryRepository) UpdateApprovalStatus(userID string, status string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	user, exists := r.users[userID]
+	if !exists {
+		return ErrUserNotFound
+	}
+	user.ApprovalStatus = status
+	return nil
+}
+
+func (r *MemoryRepository) ListUsersByCompany(companyName string, approvalStatus string) ([]*User, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []*User
+	normCompany := strings.ToLower(strings.TrimSpace(companyName))
+	for _, u := range r.users {
+		if strings.ToLower(strings.TrimSpace(u.Company)) == normCompany {
+			if approvalStatus == "" || strings.EqualFold(u.ApprovalStatus, approvalStatus) {
+				result = append(result, u)
+			}
+		}
+	}
+	return result, nil
 }

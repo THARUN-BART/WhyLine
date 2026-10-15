@@ -17,6 +17,7 @@ import (
 	"github.com/THARUN-BART/whyline/backend/internal/memory"
 	"github.com/THARUN-BART/whyline/backend/internal/rag"
 	"github.com/THARUN-BART/whyline/backend/internal/seed"
+	"github.com/THARUN-BART/whyline/backend/internal/ticket"
 	"github.com/THARUN-BART/whyline/backend/internal/tools"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -79,44 +80,64 @@ func main() {
 	// Mount Auth routes
 	authHandler.RegisterRoutes(r)
 
-	// Mount Graph and Seed routes (if connected)
+	// Mount Graph, Tool, Ticket, and Memory routes (if connected)
+	ticketService := ticket.NewService(graphClient, "company")
+	ticketHandler := ticket.NewHandler(ticketService)
+	ticketHandler.RegisterRoutes(r, authService.Middleware, authService.ApprovedUserMiddleware)
+
 	if graphClient != nil {
-		graphHandler := graph.NewHandler(graphClient, "company")
-		graphHandler.RegisterRoutes(r)
+		// Group routes that serve dashboard/data with OptionalApprovedUserMiddleware
+		// Guests without token can inspect demo, but pending employees with token are strictly blocked (403)!
+		r.Group(func(sub chi.Router) {
+			sub.Use(authService.OptionalApprovedUserMiddleware)
+
+			graphHandler := graph.NewHandler(graphClient, "company")
+			graphHandler.RegisterRoutes(sub)
+
+			toolsEngine := tools.NewEngine(graphClient, "company")
+			toolsHandler := tools.NewHandler(toolsEngine)
+			toolsHandler.RegisterRoutes(sub)
+
+			memoryService := memory.NewService(graphClient, "company", toolsEngine)
+			memoryHandler := memory.NewHandler(memoryService)
+			memoryHandler.RegisterRoutes(sub)
+
+			validator := agent.NewIDValidator(graphClient, "company")
+			geminiAgent := agent.NewGeminiAgent(cfg.GeminiKey, cfg.GeminiModel, toolsEngine, memoryService, validator)
+			agentHandler := agent.NewHandler(geminiAgent)
+			agentHandler.RegisterRoutes(sub)
+
+			// Module 7: Vs-RAG baseline comparison
+			vectorizer := rag.NewVectorizer(cfg.GeminiKey)
+			ragService := rag.NewService(vectorizer, toolsEngine, cfg.GeminiKey, cfg.GeminiModel)
+			ragHandler := rag.NewHandler(ragService)
+			ragHandler.RegisterRoutes(sub)
+		})
 
 		seeder := seed.NewSeeder(graphClient, "company")
 		_ = seeder.CheckAndAutoSeed(context.Background())
 		seedHandler := seed.NewHandler(seeder)
 		seedHandler.RegisterRoutes(r)
-
-		toolsEngine := tools.NewEngine(graphClient, "company")
-		toolsHandler := tools.NewHandler(toolsEngine)
-		toolsHandler.RegisterRoutes(r)
-
-		memoryService := memory.NewService(graphClient, "company", toolsEngine)
-		memoryHandler := memory.NewHandler(memoryService)
-		memoryHandler.RegisterRoutes(r)
-
-		validator := agent.NewIDValidator(graphClient, "company")
-		geminiAgent := agent.NewGeminiAgent(cfg.GeminiKey, cfg.GeminiModel, toolsEngine, memoryService, validator)
-		agentHandler := agent.NewHandler(geminiAgent)
-		agentHandler.RegisterRoutes(r)
-
-		// Module 7: Vs-RAG baseline comparison
-		vectorizer := rag.NewVectorizer(cfg.GeminiKey)
-		ragService := rag.NewService(vectorizer, toolsEngine, cfg.GeminiKey, cfg.GeminiModel)
-		ragHandler := rag.NewHandler(ragService)
-		ragHandler.RegisterRoutes(r)
 	}
 
-	// Protected test endpoint to verify JWT middleware
+	// Strictly protected endpoints requiring authentication + company approval
 	r.Group(func(r chi.Router) {
 		r.Use(authService.Middleware)
+		r.Use(authService.ApprovedUserMiddleware)
+
 		r.Get("/api/protected-ping", func(w http.ResponseWriter, r *http.Request) {
 			userID, _ := auth.GetUserIDFromContext(r.Context())
+			claims, _ := auth.GetClaimsFromContext(r.Context())
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_, _ = fmt.Fprintf(w, `{"message":"pong","authenticated_user_id":"%s"}`, userID)
+			_, _ = fmt.Fprintf(w, `{"message":"pong","authenticated_user_id":"%s","company":"%s","approval_status":"%s"}`, userID, claims.Company, claims.ApprovalStatus)
+		})
+
+		r.Get("/api/dashboard/status", func(w http.ResponseWriter, r *http.Request) {
+			claims, _ := auth.GetClaimsFromContext(r.Context())
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, `{"status":"approved","message":"Dashboard access granted","company":"%s"}`, claims.Company)
 		})
 	})
 

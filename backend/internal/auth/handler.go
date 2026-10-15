@@ -32,11 +32,21 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Get("/me", h.HandleMe)
 		})
 
-		// Protected admin-only routes
+		// Protected company management routes (company_admin or platform admin)
+		r.Group(func(r chi.Router) {
+			r.Use(h.service.Middleware)
+			r.Use(h.service.CompanyAdminMiddleware)
+			r.Get("/company/employees", h.HandleListCompanyEmployees)
+			r.Post("/company/approve-user", h.HandleApproveUser)
+			r.Get("/company/stats", h.HandleGetCompanyStats)
+		})
+
+		// Protected platform admin-only routes
 		r.Group(func(r chi.Router) {
 			r.Use(h.service.Middleware)
 			r.Use(h.service.AdminMiddleware)
-			r.Post("/companies", h.HandleCreateCompany) // Only admin can add companies
+			r.Post("/companies", h.HandleCreateCompany)                  // Only platform admin can add companies
+			r.Post("/admin/create-user", h.HandleAdminCreateCompanyUser) // Platform admin can create user & company directly
 		})
 	})
 }
@@ -202,8 +212,107 @@ func (h *Handler) HandleCreateCompany(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) HandleAdminCreateCompanyUser(w http.ResponseWriter, r *http.Request) {
+	var req AdminCreateCompanyUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	adminUserID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	resp, err := h.service.AdminCreateCompanyAndUser(adminUserID, req)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == ErrUserAlreadyExists {
+			status = http.StatusConflict
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) HandleApproveUser(w http.ResponseWriter, r *http.Request) {
+	var req ApproveUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if req.UserID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "user_id is required"})
+		return
+	}
+
+	callerID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	status := req.Status
+	if status == "" {
+		status = "approved"
+	}
+
+	userResp, err := h.service.ApproveCompanyUser(callerID, req.UserID, status)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "User status updated to " + status,
+		"user":    userResp,
+	})
+}
+
+func (h *Handler) HandleListCompanyEmployees(w http.ResponseWriter, r *http.Request) {
+	callerID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	statusFilter := r.URL.Query().Get("status") // e.g. "pending", "approved", or "" for all
+	employees, err := h.service.ListCompanyEmployees(callerID, statusFilter)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"total":     len(employees),
+		"employees": employees,
+	})
+}
+
+func (h *Handler) HandleGetCompanyStats(w http.ResponseWriter, r *http.Request) {
+	callerID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	targetCompany := r.URL.Query().Get("company")
+	stats, err := h.service.GetCompanyStats(callerID, targetCompany)
+	if err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}
+
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
 }
+

@@ -9,12 +9,14 @@ All endpoints return and accept JSON unless specified otherwise (e.g. SSE stream
 ## Table of Contents
 1. [Health & Diagnostics](#1-health--diagnostics)
 2. [Authentication & Users (`/api/auth`)](#2-authentication--users-apiauth)
-3. [FalkorDB Graph Operations (`/api/graph`)](#3-falkordb-graph-operations-apigraph)
-4. [Synthetic Data Seeding (`/api/seed`)](#4-synthetic-data-seeding-apiseed)
-5. [Graph Query Tools Layer (`/api/tools`)](#5-graph-query-tools-layer-apitools)
-6. [Per-User Memory Graph (`/api/memory`)](#6-per-user-memory-graph-apimemory)
-7. [Google Gemini Agent & SSE Stream (`/api/agent`)](#7-google-gemini-agent--sse-stream-apiagent)
-8. [Vs-RAG Baseline Comparison (`/api/rag`)](#8-vs-rag-baseline-comparison-apirag)
+3. [Company Management & Approval Flow (`/api/auth/company`)](#3-company-management--approval-flow-apiauthcompany)
+4. [Engineering Tickets API (`/api/tickets`)](#4-engineering-tickets-api-apitickets)
+5. [FalkorDB Graph Operations (`/api/graph`)](#5-falkordb-graph-operations-apigraph)
+6. [Synthetic Data Seeding (`/api/seed`)](#6-synthetic-data-seeding-apiseed)
+7. [Graph Query Tools Layer (`/api/tools`)](#7-graph-query-tools-layer-apitools)
+8. [Per-User Memory Graph (`/api/memory`)](#8-per-user-memory-graph-apimemory)
+9. [Google Gemini Agent & SSE Stream (`/api/agent`)](#9-google-gemini-agent--sse-stream-apiagent)
+10. [Vs-RAG Baseline Comparison (`/api/rag`)](#10-vs-rag-baseline-comparison-apirag)
 
 ---
 
@@ -35,7 +37,7 @@ curl -s http://localhost:8080/health
 ```
 
 ### `GET /api/protected-ping`
-Test endpoint to verify Bearer JWT authentication.
+Test endpoint to verify Bearer JWT authentication and company approval.
 ```bash
 curl -s http://localhost:8080/api/protected-ping \
   -H "Authorization: Bearer <JWT_TOKEN>"
@@ -44,7 +46,26 @@ curl -s http://localhost:8080/api/protected-ping \
 ```json
 {
   "message": "pong",
-  "authenticated_user_id": "usr_alice"
+  "authenticated_user_id": "usr_alice",
+  "company": "Acme Technologies",
+  "approval_status": "approved"
+}
+```
+
+### `GET /api/dashboard/status`
+Checks if the authenticated caller has access to the application dashboard.
+- If user registration is **pending**, returns `403 Forbidden` (`{"error":"forbidden: your registration is pending approval by your company administrator"}`).
+- If user is **approved** (or platform/company admin), returns `200 OK`.
+```bash
+curl -s http://localhost:8080/api/dashboard/status \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+**Response (200 OK):**
+```json
+{
+  "status": "approved",
+  "message": "Dashboard access granted",
+  "company": "Acme Technologies"
 }
 ```
 
@@ -83,16 +104,15 @@ curl -s -X POST http://localhost:8080/api/auth/verify-otp \
 ```
 
 ### `POST /api/auth/register`
-Creates a new user in FalkorDB after email OTP validation.
+Creates a new employee account in FalkorDB. Registration defaults to `"approval_status": "pending"` until approved by the company's main administrator.
 ```bash
 curl -s -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "engineer@company.com",
     "username": "janedoe",
-    "company": "Stripe",
-    "password": "Password123!",
-    "otp": "123456"
+    "company": "Acme Technologies",
+    "password": "Password123!"
   }'
 ```
 **Response (201 Created):**
@@ -103,46 +123,64 @@ curl -s -X POST http://localhost:8080/api/auth/register \
     "id": "usr_c48a19b2",
     "email": "engineer@company.com",
     "username": "janedoe",
-    "company": "Stripe",
+    "company": "Acme Technologies",
     "role": "user",
-    "is_verified": true,
-    "created_at": "2026-10-10T18:00:00Z"
+    "approval_status": "pending",
+    "is_verified": false,
+    "created_at": "2026-10-13T12:00:00Z"
   }
 }
 ```
 
+### Direct Admin Insertion in FalkorDB (Falcon)
+Administrators can be inserted directly into the FalkorDB database without requiring hardcoded code credentials:
+```cypher
+MERGE (u:User {email: 'whylineadmin@gmail.com'})
+SET u.id = 'usr_whylineadmin_gmail.com',
+    u.username = 'whylineadmin@gmail.com',
+    u.password = 'Tharun@29112304',
+    u.role = 'admin',
+    u.company = 'Whyline',
+    u.approval_status = 'approved',
+    u.is_verified = true
+WITH u
+MERGE (c:Company {name: 'Whyline'})
+MERGE (u)-[:BELONGS_TO]->(c);
+```
+
 ### `POST /api/auth/login`
-Authenticates user and returns JWT token.
+Authenticates user and returns JWT token. Supports direct database admins with either plaintext password or bcrypt hash.
 ```bash
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"alice@whyline.dev","password":"password123"}'
+  -d '{"email":"whylineadmin@gmail.com","password":"Tharun@29112304"}'
 ```
 **Response (200 OK):**
 ```json
 {
   "token": "eyJhbGciOi...",
   "user": {
-    "id": "usr_alice",
-    "email": "alice@whyline.dev",
-    "username": "alice",
-    "company": "Acme Technologies",
-    "role": "engineer",
+    "id": "usr_whylineadmin_gmail.com",
+    "email": "whylineadmin@gmail.com",
+    "username": "whylineadmin@gmail.com",
+    "company": "Whyline",
+    "role": "admin",
+    "approval_status": "approved",
     "is_verified": true,
-    "created_at": "2026-10-10T18:00:00Z"
+    "created_at": "2026-10-13T12:00:00Z"
   }
 }
 ```
 
 ### `GET /api/auth/me`
-Fetches currently authenticated user profile.
+Fetches currently authenticated user profile including `approval_status`.
 ```bash
 curl -s http://localhost:8080/api/auth/me \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
 ### `GET /api/auth/companies`
-Returns all registered companies. Used by Frontend during signup so users can select only from available organizations created by an admin.
+Returns all registered companies with user counts. Used by Frontend during signup so users can select only from available organizations created by an admin.
 ```bash
 curl -s http://localhost:8080/api/auth/companies
 ```
@@ -151,9 +189,9 @@ curl -s http://localhost:8080/api/auth/companies
 {
   "total": 3,
   "companies": [
-    { "id": "comp_acme", "name": "Acme Technologies", "created_at": "2026-10-10T18:00:00Z" },
-    { "id": "comp_stripe", "name": "Stripe", "created_at": "2026-10-10T18:00:00Z" },
-    { "id": "comp_whyline", "name": "Whyline Corp", "created_at": "2026-10-10T18:00:00Z" }
+    { "id": "comp_acme", "name": "Acme Technologies", "user_count": 5, "created_at": "2026-10-10T18:00:00Z" },
+    { "id": "comp_stripe", "name": "Stripe", "user_count": 3, "created_at": "2026-10-10T18:00:00Z" },
+    { "id": "comp_whyline", "name": "Whyline", "user_count": 1, "created_at": "2026-10-10T18:00:00Z" }
   ]
 }
 ```
@@ -170,21 +208,6 @@ curl -s -X POST http://localhost:8080/api/auth/admin/register \
     "admin_secret": "whyline-admin-secret-2026"
   }'
 ```
-**Response (201 Created):**
-```json
-{
-  "token": "eyJhbGciOi...",
-  "user": {
-    "id": "adm_48a9b2",
-    "email": "admin@whyline.dev",
-    "username": "sysadmin",
-    "company": "Whyline Platform",
-    "role": "admin",
-    "is_verified": true,
-    "created_at": "2026-10-10T18:00:00Z"
-  }
-}
-```
 
 ### `POST /api/auth/companies` *(Admin Only)*
 Adds a new company to FalkorDB. Only accessible with a valid Bearer JWT of an account having `"role": "admin"`.
@@ -192,39 +215,210 @@ Adds a new company to FalkorDB. Only accessible with a valid Bearer JWT of an ac
 curl -s -X POST http://localhost:8080/api/auth/companies \
   -H "Authorization: Bearer <ADMIN_JWT_TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Google DeepMind"}'
+  -d '{"name": "NovaTech"}'
+```
+
+### `GET /api/auth/users`
+Returns registered users with company affiliations.
+```bash
+curl -s http://localhost:8080/api/auth/users
+```
+
+---
+
+## 3. Company Management & Approval Flow (`/api/auth/company`)
+
+### `POST /api/auth/admin/create-user` *(Platform Admin Only)*
+Platform admin creates a company and its initial company administrator (`company_admin`).
+```bash
+curl -s -X POST http://localhost:8080/api/auth/admin/create-user \
+  -H "Authorization: Bearer <PLATFORM_ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company_name": "NovaTech",
+    "email": "lead@novatech.io",
+    "username": "nova_lead",
+    "password": "NovaPassword123!",
+    "role": "company_admin"
+  }'
 ```
 **Response (201 Created):**
 ```json
 {
-  "message": "Company created successfully",
-  "company": {
-    "id": "comp_65f8a0",
-    "name": "Google DeepMind",
-    "created_at": "2026-10-10T18:30:00Z"
+  "token": "eyJhbGciOi...",
+  "user": {
+    "id": "usr_93dbf3b1",
+    "email": "lead@novatech.io",
+    "username": "nova_lead",
+    "company": "NovaTech",
+    "role": "company_admin",
+    "approval_status": "approved",
+    "is_verified": true,
+    "created_at": "2026-10-13T12:00:00Z"
   }
 }
 ```
 
-### `GET /api/auth/users`
-Returns all registered and demo users (used by Frontend user switcher).
+### `GET /api/auth/company/stats` *(Company Admin / Admin)*
+Fetches company employee metrics for the caller's company alone. Company admins are strictly isolated to their own company.
 ```bash
-curl -s http://localhost:8080/api/auth/users
+curl -s http://localhost:8080/api/auth/company/stats \
+  -H "Authorization: Bearer <COMPANY_ADMIN_TOKEN>"
 ```
 **Response (200 OK):**
 ```json
 {
-  "users": [
-    { "id": "usr_alice", "email": "alice@whyline.dev", "username": "alice", "company": "Acme Technologies", "role": "engineer", "is_verified": true },
-    { "id": "usr_bob", "email": "bob@whyline.dev", "username": "bob", "company": "Acme Technologies", "role": "product_manager", "is_verified": true },
-    { "id": "usr_demo", "email": "demo@whyline.dev", "username": "demo", "company": "Whyline Corp", "role": "admin", "is_verified": true }
+  "company": "NovaTech",
+  "user_count": 2,
+  "approved_count": 1,
+  "pending_count": 1,
+  "rejected_count": 0
+}
+```
+
+### `GET /api/auth/company/employees` *(Company Admin / Admin)*
+Lists employees belonging to the caller's company, with optional status filter (`?status=pending` or `?status=approved`).
+```bash
+curl -s "http://localhost:8080/api/auth/company/employees?status=pending" \
+  -H "Authorization: Bearer <COMPANY_ADMIN_TOKEN>"
+```
+**Response (200 OK):**
+```json
+{
+  "total": 1,
+  "employees": [
+    {
+      "id": "3eccc525-92b1-443c-bbcf-64e19db90322",
+      "email": "dave@novatech.io",
+      "username": "dave_dev",
+      "company": "NovaTech",
+      "role": "user",
+      "approval_status": "pending",
+      "is_verified": true,
+      "created_at": "2026-10-13T12:00:00Z"
+    }
   ]
+}
+```
+
+### `POST /api/auth/company/approve-user` *(Company Admin / Admin)*
+Approves or rejects an employee registration. Once approved, the employee can immediately access the dashboard and data graph.
+```bash
+curl -s -X POST http://localhost:8080/api/auth/company/approve-user \
+  -H "Authorization: Bearer <COMPANY_ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "3eccc525-92b1-443c-bbcf-64e19db90322",
+    "status": "approved"
+  }'
+```
+**Response (200 OK):**
+```json
+{
+  "message": "User status updated to approved",
+  "user": {
+    "id": "3eccc525-92b1-443c-bbcf-64e19db90322",
+    "email": "dave@novatech.io",
+    "username": "dave_dev",
+    "company": "NovaTech",
+    "role": "user",
+    "approval_status": "approved",
+    "is_verified": true,
+    "created_at": "2026-10-13T12:00:00Z"
+  }
 }
 ```
 
 ---
 
-## 3. FalkorDB Graph Operations (`/api/graph`)
+## 4. Engineering Tickets API (`/api/tickets`)
+
+Full provenance engineering issue tracker linking Jira tickets directly to architectural decisions (`(:Decision)-[:APPROVED_IN]->(:Ticket)`), affected systems (`(:Ticket)-[:AFFECTS]->(:System)`), and users (`(:User)-[:CREATED]->(:Ticket)`). Requires valid JWT and approved user status.
+
+### `POST /api/tickets`
+Creates an engineering ticket in FalkorDB.
+```bash
+curl -s -X POST http://localhost:8080/api/tickets \
+  -H "Authorization: Bearer <APPROVED_JWT_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "NOVA-101: Migrate Payment Gateway to Async Webhooks",
+    "description": "Establish idempotent webhook receiver for credit card authorizations.",
+    "url": "https://jira.novatech.io/browse/NOVA-101",
+    "priority": "P0",
+    "decision_id": "dec_billing_v2",
+    "system_id": "sys_billing"
+  }'
+```
+**Response (201 Created):**
+```json
+{
+  "id": "TICK-7286",
+  "title": "NOVA-101: Migrate Payment Gateway to Async Webhooks",
+  "description": "Establish idempotent webhook receiver for credit card authorizations.",
+  "url": "https://jira.novatech.io/browse/NOVA-101",
+  "priority": "P0",
+  "status": "Open",
+  "company": "NovaTech",
+  "created_by": "3eccc525-92b1-443c-bbcf-64e19db90322",
+  "created_at": "2026-10-13T12:00:00Z",
+  "decision_id": "dec_billing_v2",
+  "decision_title": "Move billing off legacy monolith to billing-api",
+  "system_id": "sys_billing",
+  "system_name": "billing-api"
+}
+```
+
+### `GET /api/tickets`
+Lists all tickets with linked Decision ADR and System metadata. Scoped to caller's company (platform admins can view all).
+```bash
+curl -s http://localhost:8080/api/tickets \
+  -H "Authorization: Bearer <APPROVED_JWT_TOKEN>"
+```
+**Response (200 OK):**
+```json
+{
+  "total": 8,
+  "tickets": [
+    {
+      "id": "TICK-7286",
+      "title": "NOVA-101: Migrate Payment Gateway to Async Webhooks",
+      "description": "Establish idempotent webhook receiver for credit card authorizations.",
+      "url": "https://jira.novatech.io/browse/NOVA-101",
+      "priority": "P0",
+      "status": "Open",
+      "company": "NovaTech",
+      "created_by": "3eccc525-92b1-443c-bbcf-64e19db90322",
+      "created_at": "2026-10-13T12:00:00Z",
+      "decision_id": "dec_billing_v2",
+      "decision_title": "Move billing off legacy monolith to billing-api"
+    }
+  ]
+}
+```
+
+### `GET /api/tickets/{id}`
+Fetches a single engineering ticket by ID with complete provenance links.
+```bash
+curl -s http://localhost:8080/api/tickets/TICK-7286 \
+  -H "Authorization: Bearer <APPROVED_JWT_TOKEN>"
+```
+
+### `PUT /api/tickets/{id}`
+Updates an engineering ticket's status, priority, or description.
+```bash
+curl -s -X PUT http://localhost:8080/api/tickets/TICK-7286 \
+  -H "Authorization: Bearer <APPROVED_JWT_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "Resolved",
+    "priority": "P1"
+  }'
+```
+
+---
+
+## 5. FalkorDB Graph Operations (`/api/graph`)
 
 ### `GET /api/graph/stats`
 Returns node count, edge count, and label breakdown for the knowledge graph.
@@ -257,7 +451,7 @@ curl -s -X POST http://localhost:8080/api/graph/reset
 
 ---
 
-## 4. Synthetic Data Seeding (`/api/seed`)
+## 6. Synthetic Data Seeding (`/api/seed`)
 
 ### `POST /api/seed/load`
 Idempotently loads 68 nodes, 58 edges, and deliberate architectural edge cases (honest gaps, departed owners, orphaned services).
@@ -281,7 +475,7 @@ curl -s -X POST http://localhost:8080/api/seed/reset
 
 ---
 
-## 5. Graph Query Tools Layer (`/api/tools`)
+## 7. Graph Query Tools Layer (`/api/tools`)
 
 These tools are invoked deterministically by the Gemini Agent or called directly by the UI.
 
@@ -382,7 +576,7 @@ curl -s "http://localhost:8080/api/tools/bus-factor"
 
 ---
 
-## 6. Per-User Memory Graph (`/api/memory`)
+## 8. Per-User Memory Graph (`/api/memory`)
 
 Stores questions and simulated architecture changes in isolated per-user subgraphs `memory_<user_id>`.
 
@@ -429,7 +623,7 @@ curl -s -X POST http://localhost:8080/api/memory/reset \
 
 ---
 
-## 7. Google Gemini Agent & SSE Stream (`/api/agent`)
+## 9. Google Gemini Agent & SSE Stream (`/api/agent`)
 
 Powered by `gemini-3.8-flash` with multi-turn tool calling, anti-hallucination ID validation, and deterministic offline fallback.
 
@@ -483,7 +677,7 @@ data: {"answer":"ledger-service is ORPHANED with Risk Score 100...","cited_node_
 
 ---
 
-## 8. Vs-RAG Baseline Comparison (`/api/rag`)
+## 10. Vs-RAG Baseline Comparison (`/api/rag`)
 
 Demonstrates Whyline's split-screen: Naive Vector RAG vs FalkorDB Graph Agent.
 

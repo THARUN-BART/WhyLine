@@ -46,6 +46,10 @@ func NewOTPManager(expiry time.Duration, appEmail, appPassword, smtpHost, smtpPo
 	}
 }
 
+func (m *OTPManager) HasSMTP() bool {
+	return m.appEmail != "" && m.appPassword != ""
+}
+
 // GenerateAndStore generates a cryptographically random 6-digit OTP and stores it.
 func (m *OTPManager) GenerateAndStore(email string) (string, error) {
 	normEmail := strings.ToLower(strings.TrimSpace(email))
