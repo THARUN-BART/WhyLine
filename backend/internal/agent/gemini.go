@@ -94,7 +94,6 @@ func (a *GeminiAgent) executeGeminiLoop(
 	steps []AgentStep,
 	start time.Time,
 ) (*ChatResponse, error) {
-	// Fix #11: Use header-based API key instead of URL query param to avoid key leakage in logs.
 	apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", a.model)
 
 	// Construct system instruction and function declarations

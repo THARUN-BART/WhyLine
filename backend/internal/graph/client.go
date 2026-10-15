@@ -41,7 +41,6 @@ func NewClientWithAuth(host, port, username, password string, useTLS bool) (*Cli
 				opts = append(opts, redis.DialPassword(password))
 			}
 			if useTLS {
-				// Security fix #3: TLS certificate verification is enforced — DialTLSSkipVerify removed
 				opts = append(opts, redis.DialUseTLS(true))
 			}
 
@@ -185,7 +184,6 @@ func injectParams(query string, params map[string]interface{}) string {
 		var valStr string
 		switch val := v.(type) {
 		case string:
-			// Security fix: Escape backslashes first, then escape single quotes to prevent injection
 			escaped := strings.ReplaceAll(val, "\\", "\\\\")
 			escaped = strings.ReplaceAll(escaped, "'", "\\'")
 			valStr = fmt.Sprintf("'%s'", escaped)

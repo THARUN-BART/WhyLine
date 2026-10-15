@@ -40,7 +40,6 @@ func Load() *Config {
 		log.Println("[INFO] No .env file found or error loading, using system environment")
 	}
 
-	// Fix #1: Require JWT_SECRET and ADMIN_SECRET — crash at startup if missing.
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("[FATAL] JWT_SECRET environment variable is required but not set")
@@ -87,7 +86,6 @@ func Load() *Config {
 	falkorTLSStr := strings.ToLower(getEnv("FALKORDB_TLS", "false"))
 	falkorTLS := falkorTLSStr == "true" || falkorTLSStr == "1" || strings.HasPrefix(falkorEndpoint, "rediss://") || falkorPort == "6380"
 
-	// Fix #20: Validate graph name to prevent injection via environment variable.
 	if !graphNameRegex.MatchString(falkorGraph) {
 		log.Fatalf("[FATAL] FALKORDB_GRAPH value %q is invalid: only alphanumeric characters and underscores are allowed", falkorGraph)
 	}

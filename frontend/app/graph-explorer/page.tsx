@@ -81,7 +81,7 @@ export default function GraphExplorerPage() {
             <div>
               <span className="font-label-code-sm text-xs text-outline uppercase font-semibold">Total Nodes</span>
               <p className="font-headline-xl text-2xl font-bold text-primary mt-1">
-                {stats?.total_nodes || 68}
+                {stats ? stats.total_nodes : 0}
               </p>
             </div>
             <span className="material-symbols-outlined text-3xl text-primary/40">hub</span>
@@ -91,7 +91,7 @@ export default function GraphExplorerPage() {
             <div>
               <span className="font-label-code-sm text-xs text-outline uppercase font-semibold">Total Edges</span>
               <p className="font-headline-xl text-2xl font-bold text-secondary mt-1">
-                {stats?.total_edges || 58}
+                {stats ? stats.total_edges : 0}
               </p>
             </div>
             <span className="material-symbols-outlined text-3xl text-secondary/40">alt_route</span>

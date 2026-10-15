@@ -72,7 +72,7 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleQuery(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	ctx := r.Context()
 	var payload QueryPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {

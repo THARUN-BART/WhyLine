@@ -184,7 +184,6 @@ func (v *Vectorizer) EmbedWithGemini(text string) ([]float32, error) {
 		return nil, fmt.Errorf("gemini api key not configured")
 	}
 
-	// Fix #11: Pass API key via header instead of URL query param.
 	url := "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
 	var reqBody GeminiEmbedRequest
 	reqBody.Model = "models/text-embedding-004"

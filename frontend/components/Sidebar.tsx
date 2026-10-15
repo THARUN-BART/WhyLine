@@ -37,8 +37,8 @@ export function Sidebar() {
     ];
   }
 
-  const totalNodes = graphStats?.total_nodes ?? 68;
-  const totalEdges = graphStats?.total_edges ?? 58;
+  const totalNodes = graphStats?.total_nodes ?? 0;
+  const totalEdges = graphStats?.total_edges ?? 0;
 
   const displayName = currentUser?.name || currentUser?.username || currentUser?.email || 'Guest';
   const displayRole = currentUser?.role || 'Member';

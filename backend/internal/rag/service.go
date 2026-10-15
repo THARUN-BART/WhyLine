@@ -156,9 +156,13 @@ func (s *Service) compareBlastRadius(ctx context.Context, question string, ragRe
 		chunkCitations = append(chunkCitations, fmt.Sprintf("- [%s] %s (sim: %.3f)", r.Chunk.SourceID, r.Chunk.Title, r.Score))
 	}
 
+	sourceID := "DOC-101"
+	if len(ragResults) > 0 {
+		sourceID = ragResults[0].Chunk.SourceID
+	}
 	ragAnswer := fmt.Sprintf(
 		"Based on retrieved documents (%s), reversing this decision would revert billing logic back to the legacy monolith, which was previously abandoned because it dropped 4%% of checkout transactions during Black Friday peak sales. The documents explain database connection exhaustion in the monolith.",
-		ragResults[0].Chunk.SourceID,
+		sourceID,
 	)
 
 	ragBlindspots := []string{

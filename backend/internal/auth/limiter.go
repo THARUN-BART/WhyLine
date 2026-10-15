@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// IPRateLimiter provides sliding-window rate limiting per IP address without external dependencies (Fix #9).
+// IPRateLimiter provides sliding-window rate limiting per IP address without external dependencies.
 type IPRateLimiter struct {
 	mu     sync.Mutex
 	limits map[string][]time.Time

@@ -25,7 +25,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 }
 
 func (h *Handler) getUserID(r *http.Request, reqUserID string) string {
-	// Fix #8: Only read userID from JWT context — never from query params or anonymous defaults.
 	if userID, ok := auth.GetUserIDFromContext(r.Context()); ok && userID != "" {
 		return userID
 	}
@@ -33,7 +32,6 @@ func (h *Handler) getUserID(r *http.Request, reqUserID string) string {
 }
 
 func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
-	// Fix #10: Limit request body to 1MB.
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	var req ChatRequest
@@ -72,7 +70,6 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	// Standard synchronous JSON response
 	response, err := h.agent.Ask(r.Context(), userID, req.Question, nil)
 	if err != nil {
-		// Fix #18: Do not expose internal error details to the client.
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "agent request failed"})
 		return
 	}
@@ -100,7 +97,6 @@ func (h *Handler) handleSSEChat(w http.ResponseWriter, r *http.Request, userID, 
 
 	response, err := h.agent.Ask(r.Context(), userID, question, onStep)
 	if err != nil {
-		// Fix #18: Do not expose internal error details over SSE.
 		errData, _ := json.Marshal(map[string]string{"error": "agent request failed"})
 		_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", string(errData))
 		flusher.Flush()

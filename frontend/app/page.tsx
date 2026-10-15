@@ -136,8 +136,8 @@ export default function HomePage() {
 
   const orphanedSystem = busFactor?.orphaned_systems?.[0];
   const totalSystemsCount = busFactor?.total_systems ?? 10;
-  const totalNodes = graphStats?.total_nodes ?? 68;
-  const totalEdges = graphStats?.total_edges ?? 58;
+  const totalNodes = graphStats?.total_nodes ?? 0;
+  const totalEdges = graphStats?.total_edges ?? 0;
 
   return (
     <main className="flex-1 max-w-[1600px] w-full mx-auto p-space-xl">

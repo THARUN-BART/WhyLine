@@ -48,7 +48,7 @@ func (h *Handler) HandleGetPresets(w http.ResponseWriter, r *http.Request) {
 
 // HandleSearch performs cosine similarity search.
 func (h *Handler) HandleSearch(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req SearchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid json body"}`, http.StatusBadRequest)
@@ -76,7 +76,7 @@ func (h *Handler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 
 // HandleCompare runs the split-screen comparison between Vector RAG and FalkorDB.
 func (h *Handler) HandleCompare(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req CompareRequest
 	if r.Body != nil {
 		_ = json.NewDecoder(r.Body).Decode(&req)

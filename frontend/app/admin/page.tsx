@@ -6,7 +6,7 @@ import { api, Company, User } from '@/lib/api';
 import { useUser } from '@/components/UserContext';
 
 export default function AdminPage() {
-  const { currentUser, isAdmin, companies, refreshCompanies, graphStats } = useUser();
+  const { currentUser, isAdmin, companies, refreshCompanies, graphStats, refreshStats } = useUser();
 
   // State: Create Company
   const [newCompanyName, setNewCompanyName] = useState('');
@@ -34,6 +34,7 @@ export default function AdminPage() {
       const [uRes] = await Promise.all([
         api.getUsers().catch(() => ({ users: [] })),
         refreshCompanies().catch(() => null),
+        refreshStats().catch(() => null),
       ]);
       if (uRes?.users) setAllUsers(uRes.users);
     } catch {
@@ -228,7 +229,7 @@ export default function AdminPage() {
               <span className="material-symbols-outlined text-outline text-lg">hub</span>
             </div>
             <div className="font-headline-xl text-3xl text-on-surface font-bold mt-2">
-              {graphStats?.total_nodes ?? 68}
+              {graphStats ? graphStats.total_nodes : (isLoadingData ? '—' : 0)}
             </div>
             <span className="text-[10px] text-outline mt-1 font-label-code-sm">Knowledge graph entities</span>
           </div>
@@ -241,7 +242,7 @@ export default function AdminPage() {
               <span className="material-symbols-outlined text-outline text-lg">share</span>
             </div>
             <div className="font-headline-xl text-3xl text-on-surface font-bold mt-2">
-              {graphStats?.total_edges ?? 58}
+              {graphStats ? graphStats.total_edges : (isLoadingData ? '—' : 0)}
             </div>
             <span className="text-[10px] text-outline mt-1 font-label-code-sm">Cross-domain relationships</span>
           </div>

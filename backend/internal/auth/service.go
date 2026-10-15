@@ -83,7 +83,6 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 	if email == "" || username == "" || password == "" {
 		return nil, ErrEmptyFields
 	}
-	// Security fix #17: max input length to prevent memory exhaustion
 	if len(email) > 254 || len(username) > 50 || len(company) > 100 {
 		return nil, errors.New("input too long: email max 254, username max 50, company max 100 characters")
 	}

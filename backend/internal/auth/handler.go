@@ -17,13 +17,12 @@ type Handler struct {
 func NewHandler(service *Service) *Handler {
 	return &Handler{
 		service: service,
-		limiter: NewIPRateLimiter(10, time.Minute), // Fix #9: 10 requests per minute per IP
+		limiter: NewIPRateLimiter(10, time.Minute),
 	}
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Route("/api/auth", func(r chi.Router) {
-		// Public routes with rate limiting (Fix #9)
 		r.Group(func(public chi.Router) {
 			public.Use(h.limiter.Middleware)
 			public.Post("/send-otp", h.HandleSendOTP)
@@ -39,7 +38,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Get("/me", h.HandleMe)
 		})
 
-		// Security fix #5: /users is now admin-only — was completely unprotected
 		r.Group(func(r chi.Router) {
 			r.Use(h.service.Middleware)
 			r.Use(h.service.AdminMiddleware)
@@ -59,7 +57,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(h.service.Middleware)
 			r.Use(h.service.AdminMiddleware)
-			// Security fix #4: admin/register now requires an existing admin token
 			r.Post("/admin/register", h.HandleAdminRegister)
 			r.Post("/companies", h.HandleCreateCompany)
 			r.Post("/admin/create-user", h.HandleAdminCreateCompanyUser)
@@ -169,7 +166,7 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleAdminRegister(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req AdminRegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
@@ -204,7 +201,7 @@ func (h *Handler) HandleListCompanies(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleCreateCompany(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req CreateCompanyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
@@ -235,7 +232,7 @@ func (h *Handler) HandleCreateCompany(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleAdminCreateCompanyUser(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req AdminCreateCompanyUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
@@ -262,7 +259,7 @@ func (h *Handler) HandleAdminCreateCompanyUser(w http.ResponseWriter, r *http.Re
 }
 
 func (h *Handler) HandleApproveUser(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req ApproveUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})

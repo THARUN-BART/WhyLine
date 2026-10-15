@@ -73,11 +73,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const refreshStats = async () => {
     try {
       const stats = await api.getGraphStats();
-      if (stats && stats.total_nodes) {
-        setGraphStats({ total_nodes: stats.total_nodes, total_edges: stats.total_edges });
+      if (stats && typeof stats.total_nodes === 'number') {
+        setGraphStats({ total_nodes: stats.total_nodes, total_edges: stats.total_edges ?? 0 });
       }
     } catch {
-      // fallback
+      // ignore
     }
   };
 
@@ -97,8 +97,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const savedUser = currentUser;
 
     async function loadData() {
-      // Always refresh companies for signup dropdown
+      // Always refresh companies and live graph stats on boot
       refreshCompanies();
+      refreshStats();
 
       // Only fetch users list if an authenticated admin session exists
       if (savedToken && savedUser?.role === 'admin') {
@@ -110,9 +111,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // ignore
         }
-      }
-      if (savedToken) {
-        refreshStats();
       }
     }
     loadData();
@@ -136,6 +134,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     }
     refreshCompanies();
+    refreshStats();
     return res.user;
   };
 

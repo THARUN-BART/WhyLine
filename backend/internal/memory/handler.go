@@ -26,8 +26,6 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 }
 
 func (h *Handler) getUserID(r *http.Request) string {
-	// Security fix #8: always derive userID from validated JWT context only
-	// Never trust user-supplied query params or body fields for identity
 	if userID, ok := auth.GetUserIDFromContext(r.Context()); ok && userID != "" {
 		return userID
 	}
@@ -49,7 +47,7 @@ func (h *Handler) HandleRecall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleSaveQuestion(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req SaveQuestionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
@@ -61,7 +59,6 @@ func (h *Handler) HandleSaveQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Security fix #8: always use JWT-authenticated userID — ignore any user_id in body
 	userID := h.getUserID(r)
 	if userID == "" {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
@@ -78,14 +75,13 @@ func (h *Handler) HandleSaveQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleSimulateChange(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	var req SimulateChangeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 		return
 	}
 
-	// Security fix #8: always use JWT-authenticated userID — ignore body user_id
 	userID := h.getUserID(r)
 	if userID == "" {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
