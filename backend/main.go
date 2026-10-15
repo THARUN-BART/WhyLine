@@ -13,6 +13,7 @@ import (
 	"github.com/THARUN-BART/whyline/backend/internal/auth"
 	"github.com/THARUN-BART/whyline/backend/internal/config"
 	"github.com/THARUN-BART/whyline/backend/internal/graph"
+	"github.com/THARUN-BART/whyline/backend/internal/memory"
 	"github.com/THARUN-BART/whyline/backend/internal/seed"
 	"github.com/THARUN-BART/whyline/backend/internal/tools"
 	"github.com/go-chi/chi/v5"
@@ -89,6 +90,10 @@ func main() {
 		toolsEngine := tools.NewEngine(graphClient, "company")
 		toolsHandler := tools.NewHandler(toolsEngine)
 		toolsHandler.RegisterRoutes(r)
+
+		memoryService := memory.NewService(graphClient, "company", toolsEngine)
+		memoryHandler := memory.NewHandler(memoryService)
+		memoryHandler.RegisterRoutes(r)
 	}
 
 	// Protected test endpoint to verify JWT middleware
