@@ -13,6 +13,7 @@ import (
 	"github.com/THARUN-BART/whyline/backend/internal/auth"
 	"github.com/THARUN-BART/whyline/backend/internal/config"
 	"github.com/THARUN-BART/whyline/backend/internal/graph"
+	"github.com/THARUN-BART/whyline/backend/internal/seed"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -74,10 +75,15 @@ func main() {
 	// Mount Auth routes
 	authHandler.RegisterRoutes(r)
 
-	// Mount Graph routes (if connected)
+	// Mount Graph and Seed routes (if connected)
 	if graphClient != nil {
 		graphHandler := graph.NewHandler(graphClient, "company")
 		graphHandler.RegisterRoutes(r)
+
+		seeder := seed.NewSeeder(graphClient, "company")
+		_ = seeder.CheckAndAutoSeed(context.Background())
+		seedHandler := seed.NewHandler(seeder)
+		seedHandler.RegisterRoutes(r)
 	}
 
 	// Protected test endpoint to verify JWT middleware
