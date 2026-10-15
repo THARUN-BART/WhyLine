@@ -15,6 +15,7 @@ import (
 	"github.com/THARUN-BART/whyline/backend/internal/config"
 	"github.com/THARUN-BART/whyline/backend/internal/graph"
 	"github.com/THARUN-BART/whyline/backend/internal/memory"
+	"github.com/THARUN-BART/whyline/backend/internal/rag"
 	"github.com/THARUN-BART/whyline/backend/internal/seed"
 	"github.com/THARUN-BART/whyline/backend/internal/tools"
 	"github.com/go-chi/chi/v5"
@@ -100,6 +101,12 @@ func main() {
 		geminiAgent := agent.NewGeminiAgent(cfg.GeminiKey, cfg.GeminiModel, toolsEngine, memoryService, validator)
 		agentHandler := agent.NewHandler(geminiAgent)
 		agentHandler.RegisterRoutes(r)
+
+		// Module 7: Vs-RAG baseline comparison
+		vectorizer := rag.NewVectorizer(cfg.GeminiKey)
+		ragService := rag.NewService(vectorizer, toolsEngine, cfg.GeminiKey, cfg.GeminiModel)
+		ragHandler := rag.NewHandler(ragService)
+		ragHandler.RegisterRoutes(r)
 	}
 
 	// Protected test endpoint to verify JWT middleware
