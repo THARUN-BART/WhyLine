@@ -1,0 +1,49 @@
+# Go build binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Compiled binaries
+/bin/
+/build/
+/dist/
+
+# Go coverage
+coverage.out
+coverage.html
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# Air live-reload
+.air.toml
+
+# Test artifacts
+test-results/
+
+# Go workspace
+go.work.sum

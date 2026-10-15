@@ -1,0 +1,99 @@
+package auth
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
+
+type Handler struct {
+	service *Service
+}
+
+func NewHandler(service *Service) *Handler {
+	return &Handler{service: service}
+}
+
+func (h *Handler) RegisterRoutes(r chi.Router) {
+	r.Route("/api/auth", func(r chi.Router) {
+		r.Post("/register", h.HandleRegister)
+		r.Post("/login", h.HandleLogin)
+		r.Get("/users", h.HandleListUsers)
+
+		// Protected routes
+		r.Group(func(r chi.Router) {
+			r.Use(h.service.Middleware)
+			r.Get("/me", h.HandleMe)
+		})
+	})
+}
+
+func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
+	var req RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	resp, err := h.service.Register(req)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == ErrUserAlreadyExists {
+			status = http.StatusConflict
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	resp, err := h.service.Login(req)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) HandleMe(w http.ResponseWriter, r *http.Request) {
+	userID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	user, err := h.service.GetUserByID(userID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
+	users := h.service.repo.ListAll()
+	var responses []UserResponse
+	for _, u := range users {
+		responses = append(responses, u.ToResponse())
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"users": responses,
+	})
+}
+
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(data)
+}
