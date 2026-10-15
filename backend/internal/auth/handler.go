@@ -17,6 +17,8 @@ func NewHandler(service *Service) *Handler {
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Route("/api/auth", func(r chi.Router) {
+		r.Post("/send-otp", h.HandleSendOTP)
+		r.Post("/verify-otp", h.HandleVerifyOTP)
 		r.Post("/register", h.HandleRegister)
 		r.Post("/login", h.HandleLogin)
 		r.Get("/users", h.HandleListUsers)
@@ -26,6 +28,40 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Use(h.service.Middleware)
 			r.Get("/me", h.HandleMe)
 		})
+	})
+}
+
+func (h *Handler) HandleSendOTP(w http.ResponseWriter, r *http.Request) {
+	var req SendOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if err := h.service.SendOTP(req.Email); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "OTP verification code sent to " + req.Email,
+	})
+}
+
+func (h *Handler) HandleVerifyOTP(w http.ResponseWriter, r *http.Request) {
+	var req VerifyOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if err := h.service.VerifyOTP(req.Email, req.OTP); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Email successfully verified",
 	})
 }
 

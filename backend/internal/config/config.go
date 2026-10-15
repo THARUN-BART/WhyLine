@@ -21,6 +21,11 @@ type Config struct {
 	OpenAIKey    string
 	GeminiKey    string
 	LLMModel     string
+	AppEmail     string
+	AppPassword  string
+	SMTPHost     string
+	SMTPPort     string
+	OTPExpiry    time.Duration
 }
 
 func Load() *Config {
@@ -47,6 +52,12 @@ func Load() *Config {
 		corsAllowed[i] = strings.TrimSpace(corsAllowed[i])
 	}
 
+	otpExpiryStr := getEnv("OTP_EXPIRY", "10m")
+	otpExpiry, err := time.ParseDuration(otpExpiryStr)
+	if err != nil {
+		otpExpiry = 10 * time.Minute
+	}
+
 	return &Config{
 		Port:        port,
 		JWTSecret:   jwtSecret,
@@ -59,6 +70,11 @@ func Load() *Config {
 		OpenAIKey:   getEnv("OPENAI_API_KEY", ""),
 		GeminiKey:   getEnv("GEMINI_API_KEY", ""),
 		LLMModel:    getEnv("LLM_MODEL", "gpt-4o-mini"),
+		AppEmail:    getEnv("APP_EMAIL", ""),
+		AppPassword: getEnv("APP_PASSWORD", ""),
+		SMTPHost:    getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:    getEnv("SMTP_PORT", "587"),
+		OTPExpiry:   otpExpiry,
 	}
 }
 

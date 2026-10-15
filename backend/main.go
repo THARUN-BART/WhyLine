@@ -24,7 +24,8 @@ func main() {
 
 	// Auth dependencies
 	authRepo := auth.NewMemoryRepository()
-	authService := auth.NewService(authRepo, cfg.JWTSecret, cfg.JWTExpiry)
+	otpManager := auth.NewOTPManager(cfg.OTPExpiry, cfg.AppEmail, cfg.AppPassword, cfg.SMTPHost, cfg.SMTPPort)
+	authService := auth.NewService(authRepo, cfg.JWTSecret, cfg.JWTExpiry, otpManager)
 	authHandler := auth.NewHandler(authService)
 
 	// Router setup
