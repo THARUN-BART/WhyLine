@@ -19,57 +19,18 @@ export default function HomePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        // Fetch decisions from FalkorDB
+        // Fetch decisions from FalkorDB with accurate decider and affected system links
         const dRes = await api.queryGraph(
           `MATCH (d:Decision) 
-           OPTIONAL MATCH (d)-[:DECIDED_BY]->(p:Person)
+           OPTIONAL MATCH (p:Person)-[:DECIDED]->(d)
            OPTIONAL MATCH (d)-[:AFFECTS]->(s:System)
            RETURN d.id AS id, d.title AS title, d.date AS date, d.status AS status, 
                   p.name AS decider, p.role AS decider_role, s.name AS system
+           ORDER BY d.date DESC
            LIMIT 12`
         );
         if (dRes && dRes.records && dRes.records.length > 0) {
           setDecisions(dRes.records);
-        } else {
-          // Fallback initial list
-          setDecisions([
-            {
-              id: 'dec_billing_v2',
-              title: 'Move billing off legacy monolith to billing-api',
-              date: '2025-06-12',
-              status: 'approved',
-              decider: 'Alice Smith',
-              decider_role: 'Principal Architect',
-              system: 'billing-api',
-            },
-            {
-              id: 'dec_ledger_isolation',
-              title: 'Isolate double-entry ledger-service into immutable append-only store',
-              date: '2024-11-04',
-              status: 'approved',
-              decider: 'Dave Miller',
-              decider_role: 'Former Staff Engineer',
-              system: 'ledger-service',
-            },
-            {
-              id: 'dec_payments_gateway_split',
-              title: 'Route payments-gateway to multi-processor failover',
-              date: '2025-02-18',
-              status: 'approved',
-              decider: 'Bob Jones',
-              decider_role: 'Staff Engineer (Billing)',
-              system: 'payments-gateway',
-            },
-            {
-              id: 'dec_jwt_auth_migration',
-              title: 'Migrate session tokens to stateless RSA-signed JWTs',
-              date: '2025-04-05',
-              status: 'approved',
-              decider: 'Alice Smith',
-              decider_role: 'Principal Architect',
-              system: 'auth-service',
-            },
-          ]);
         }
       } catch {
         // ignore
@@ -349,16 +310,16 @@ export default function HomePage() {
                         <td className="py-space-md px-space-sm">
                           <div className="flex items-center gap-space-xs">
                             <div className="w-6 h-6 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-label-code-sm text-label-code-sm font-bold">
-                              {dec.decider ? dec.decider[0] : 'A'}
+                              {dec.decider ? dec.decider[0] : 'C'}
                             </div>
                             <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                              {dec.decider || 'Alice Smith'}
+                              {dec.decider || 'Architecture Committee'}
                             </span>
                           </div>
                         </td>
                         <td className="py-space-md px-space-sm">
                           <span className="font-label-code-sm text-label-code-sm bg-surface-container text-on-surface px-space-xs py-space-2xs rounded">
-                            {dec.system || 'billing-api'}
+                            {dec.system || 'Platform Infra'}
                           </span>
                         </td>
                         <td className="py-space-md px-space-sm text-on-surface-variant whitespace-nowrap font-label-code-sm">

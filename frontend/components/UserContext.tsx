@@ -87,10 +87,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const res = await api.getUsers();
         if (res && res.users && res.users.length > 0) {
           setUsers(res.users);
-          // If no user was saved in localStorage, pick the first active real user from DB
-          if (!savedUser && !savedToken) {
-            setCurrentUser(res.users[0]);
-          }
         }
       } catch {
         // ignore

@@ -132,85 +132,32 @@ export function Sidebar() {
           </span>
         </div>
 
-        {/* User Account / Persona Switcher */}
+        {/* User Account / Session Controls */}
         {currentUser ? (
-          <div className="relative">
+          <div className="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low border border-outline-variant/20">
+            <div className="flex items-center gap-space-sm min-w-0">
+              <div className="relative flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-xs">
+                  {initial}
+                </div>
+                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-secondary ring-2 ring-surface-container-low"></span>
+              </div>
+              <div className="min-w-0 truncate">
+                <p className="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">
+                  {displayName}
+                </p>
+                <p className="font-label-code-sm text-[11px] text-on-surface-variant truncate">
+                  {displayRole} • {displayCompany}
+                </p>
+              </div>
+            </div>
             <button
-              onClick={() => setShowUserDropdown(!showUserDropdown)}
-              className="w-full flex items-center justify-between p-space-sm rounded-lg hover:bg-surface-container-low transition-colors text-left"
+              onClick={logoutUser}
+              title="Sign Out"
+              className="p-1.5 rounded-md hover:bg-surface-container-high text-on-surface-variant hover:text-error transition-colors"
             >
-              <div className="flex items-center gap-space-sm min-w-0">
-                <div className="relative flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-xs">
-                    {initial}
-                  </div>
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-secondary ring-2 ring-surface-container-lowest"></span>
-                </div>
-                <div className="min-w-0 truncate">
-                  <p className="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">
-                    {displayName}
-                  </p>
-                  <p className="font-label-code-sm text-label-code-sm text-on-surface-variant truncate">
-                    {displayRole}
-                  </p>
-                </div>
-              </div>
-              <span className="font-label-edge text-label-edge bg-secondary-fixed text-on-secondary-fixed px-space-xs py-space-2xs rounded uppercase font-bold">
-                Online
-              </span>
+              <span className="material-symbols-outlined text-[18px]">logout</span>
             </button>
-
-            {showUserDropdown && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-xl p-2 z-50">
-                <div className="px-2 py-1 text-xs text-outline font-semibold uppercase tracking-wider flex items-center justify-between">
-                  <span>Registered Users</span>
-                  <span className="text-[10px] text-secondary font-mono">FalkorDB</span>
-                </div>
-                <div className="max-h-40 overflow-y-auto divide-y divide-outline-variant/10">
-                  {users.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        setCurrentUser(u);
-                        setShowUserDropdown(false);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 rounded text-xs flex items-center justify-between hover:bg-surface-container-low transition-colors ${
-                        u.id === currentUser.id ? 'bg-primary-fixed/40 font-semibold text-primary' : 'text-on-surface'
-                      }`}
-                    >
-                      <div className="truncate">
-                        <p className="truncate font-medium">{u.name || u.username || u.email}</p>
-                        <p className="text-[10px] text-on-surface-variant truncate">{u.company || u.role}</p>
-                      </div>
-                      {u.id === currentUser.id && (
-                        <span className="material-symbols-outlined text-xs text-primary">check</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-2 pt-2 border-t border-outline-variant/30 flex items-center justify-between text-xs">
-                  <button
-                    onClick={() => {
-                      logoutUser();
-                      setShowUserDropdown(false);
-                    }}
-                    className="text-[11px] text-error hover:underline font-semibold flex items-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-xs">logout</span>
-                    <span>Sign Out</span>
-                  </button>
-                  <Link
-                    href="/login"
-                    onClick={() => setShowUserDropdown(false)}
-                    className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-xs">login</span>
-                    <span>Switch</span>
-                  </Link>
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
