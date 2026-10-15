@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -150,16 +152,31 @@ func (c *Client) DeleteGraph(ctx context.Context, graphName string) error {
 	return nil
 }
 
-// injectParams replaces $param in Cypher queries with properly serialized literals.
+// injectParams replaces $param in Cypher queries with properly serialized and sanitized literals.
 func injectParams(query string, params map[string]interface{}) string {
+	if len(params) == 0 {
+		return query
+	}
+
+	// Sort keys by length descending to prevent shorter prefix placeholders (e.g. $q) from corrupting longer ones ($query)
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return len(keys[i]) > len(keys[j])
+	})
+
 	res := query
-	for k, v := range params {
+	for _, k := range keys {
+		v := params[k]
 		placeholder := "$" + k
 		var valStr string
 		switch val := v.(type) {
 		case string:
-			// Escape single quotes
-			escaped := strings.ReplaceAll(val, "'", "\\'")
+			// Security fix: Escape backslashes first, then escape single quotes to prevent injection
+			escaped := strings.ReplaceAll(val, "\\", "\\\\")
+			escaped = strings.ReplaceAll(escaped, "'", "\\'")
 			valStr = fmt.Sprintf("'%s'", escaped)
 		case int, int64, float64:
 			valStr = fmt.Sprintf("%v", val)
@@ -169,7 +186,9 @@ func injectParams(query string, params map[string]interface{}) string {
 			b, _ := json.Marshal(val)
 			valStr = string(b)
 		}
-		res = strings.ReplaceAll(res, placeholder, valStr)
+
+		re := regexp.MustCompile(regexp.QuoteMeta(placeholder) + `\b`)
+		res = re.ReplaceAllLiteralString(res, valStr)
 	}
 	return res
 }

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -20,20 +21,27 @@ type Repository interface {
 	FindByID(id string) (*User, error)
 	FindByUsername(username string) (*User, error)
 	ListAll() []*User
+
+	// Company operations (Admin managed)
+	CreateCompany(name string) (*Company, error)
+	ListCompanies() ([]*Company, error)
+	CompanyExists(name string) (bool, error)
 }
 
 type MemoryRepository struct {
-	mu     sync.RWMutex
-	users  map[string]*User // keyed by ID
-	byEmail map[string]string // email -> ID
-	byName  map[string]string // username -> ID
+	mu        sync.RWMutex
+	users     map[string]*User    // keyed by ID
+	byEmail   map[string]string   // email -> ID
+	byName    map[string]string   // username -> ID
+	companies map[string]*Company // normalized name -> Company
 }
 
 func NewMemoryRepository() *MemoryRepository {
 	repo := &MemoryRepository{
-		users:   make(map[string]*User),
-		byEmail: make(map[string]string),
-		byName:  make(map[string]string),
+		users:     make(map[string]*User),
+		byEmail:   make(map[string]string),
+		byName:    make(map[string]string),
+		companies: make(map[string]*Company),
 	}
 	repo.seedDefaults()
 	return repo
@@ -47,6 +55,7 @@ func (r *MemoryRepository) seedDefaults() {
 			ID:           "usr_demo",
 			Email:        "demo@whyline.dev",
 			Username:     "demo",
+			Company:      "Whyline Corp",
 			PasswordHash: string(hashedPassword),
 			Role:         "admin",
 			CreatedAt:    time.Now().UTC(),
@@ -55,6 +64,7 @@ func (r *MemoryRepository) seedDefaults() {
 			ID:           "usr_alice",
 			Email:        "alice@whyline.dev",
 			Username:     "alice",
+			Company:      "Acme Technologies",
 			PasswordHash: string(hashedPassword),
 			Role:         "engineer",
 			CreatedAt:    time.Now().UTC(),
@@ -63,6 +73,7 @@ func (r *MemoryRepository) seedDefaults() {
 			ID:           "usr_bob",
 			Email:        "bob@whyline.dev",
 			Username:     "bob",
+			Company:      "Acme Technologies",
 			PasswordHash: string(hashedPassword),
 			Role:         "product_manager",
 			CreatedAt:    time.Now().UTC(),
@@ -71,6 +82,23 @@ func (r *MemoryRepository) seedDefaults() {
 
 	for _, u := range defaultUsers {
 		_ = r.Create(u)
+	}
+
+	// Seed default organizations
+	r.companies["whyline corp"] = &Company{
+		ID:        "comp_whyline",
+		Name:      "Whyline Corp",
+		CreatedAt: time.Now().UTC(),
+	}
+	r.companies["acme technologies"] = &Company{
+		ID:        "comp_acme",
+		Name:      "Acme Technologies",
+		CreatedAt: time.Now().UTC(),
+	}
+	r.companies["stripe"] = &Company{
+		ID:        "comp_stripe",
+		Name:      "Stripe",
+		CreatedAt: time.Now().UTC(),
 	}
 }
 
@@ -145,4 +173,47 @@ func (r *MemoryRepository) ListAll() []*User {
 		list = append(list, u)
 	}
 	return list
+}
+
+func (r *MemoryRepository) CreateCompany(name string) (*Company, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cleanName := strings.TrimSpace(name)
+	if cleanName == "" {
+		return nil, errors.New("company name cannot be empty")
+	}
+
+	normName := strings.ToLower(cleanName)
+	if comp, exists := r.companies[normName]; exists {
+		return comp, nil
+	}
+
+	comp := &Company{
+		ID:        fmt.Sprintf("comp_%d", time.Now().UnixNano()),
+		Name:      cleanName,
+		CreatedAt: time.Now().UTC(),
+	}
+	r.companies[normName] = comp
+	return comp, nil
+}
+
+func (r *MemoryRepository) ListCompanies() ([]*Company, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var list []*Company
+	for _, c := range r.companies {
+		list = append(list, c)
+	}
+	return list, nil
+}
+
+func (r *MemoryRepository) CompanyExists(name string) (bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	norm := strings.ToLower(strings.TrimSpace(name))
+	_, exists := r.companies[norm]
+	return exists, nil
 }

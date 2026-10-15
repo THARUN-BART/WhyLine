@@ -24,23 +24,29 @@ type JWTClaims struct {
 	UserID   string `json:"user_id"`
 	Email    string `json:"email"`
 	Username string `json:"username"`
+	Company  string `json:"company"`
 	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 type Service struct {
-	repo       Repository
-	jwtSecret  []byte
-	jwtExpiry  time.Duration
-	otpManager *OTPManager
+	repo        Repository
+	jwtSecret   []byte
+	jwtExpiry   time.Duration
+	otpManager  *OTPManager
+	adminSecret string
 }
 
-func NewService(repo Repository, jwtSecret string, jwtExpiry time.Duration, otpManager *OTPManager) *Service {
+func NewService(repo Repository, jwtSecret string, jwtExpiry time.Duration, otpManager *OTPManager, adminSecret string) *Service {
+	if adminSecret == "" {
+		adminSecret = "whyline-admin-secret-2026"
+	}
 	return &Service{
-		repo:       repo,
-		jwtSecret:  []byte(jwtSecret),
-		jwtExpiry:  jwtExpiry,
-		otpManager: otpManager,
+		repo:        repo,
+		jwtSecret:   []byte(jwtSecret),
+		jwtExpiry:   jwtExpiry,
+		otpManager:  otpManager,
+		adminSecret: adminSecret,
 	}
 }
 
@@ -82,6 +88,17 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 		return nil, ErrPasswordTooShort
 	}
 
+	company := strings.TrimSpace(req.Company)
+	if company == "" {
+		return nil, errors.New("company is required: please select from available registered companies")
+	}
+
+	// Validate that the company is registered by an admin
+	exists, err := s.repo.CompanyExists(company)
+	if err != nil || !exists {
+		return nil, fmt.Errorf("company '%s' is not registered. Please select an available company created by an admin", company)
+	}
+
 	isVerified := false
 	// Check if OTP was passed in registration payload
 	if req.OTP != "" {
@@ -95,6 +112,11 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 		s.otpManager.ConsumeVerification(email)
 	}
 
+	// Security fix: Enforce that email is verified before account creation
+	if !isVerified {
+		return nil, ErrEmailNotVerified
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
@@ -105,6 +127,7 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 		ID:           userID,
 		Email:        email,
 		Username:     username,
+		Company:      company,
 		PasswordHash: string(hashedPassword),
 		Role:         "user",
 		IsVerified:   isVerified,
@@ -124,6 +147,69 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 		Token: token,
 		User:  user.ToResponse(),
 	}, nil
+}
+
+// RegisterAdmin creates a new administrator using username, password, email, and admin secret key.
+func (s *Service) RegisterAdmin(req AdminRegisterRequest) (*AuthResponse, error) {
+	email := strings.TrimSpace(req.Email)
+	username := strings.TrimSpace(req.Username)
+	password := strings.TrimSpace(req.Password)
+	secret := strings.TrimSpace(req.AdminSecret)
+
+	if email == "" || username == "" || password == "" {
+		return nil, ErrEmptyFields
+	}
+	if len(password) < 6 {
+		return nil, ErrPasswordTooShort
+	}
+	if secret == "" || secret != s.adminSecret {
+		return nil, errors.New("invalid or unauthorized admin secret key")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	userID := "adm_" + uuid.New().String()[:8]
+	user := &User{
+		ID:           userID,
+		Email:        email,
+		Username:     username,
+		Company:      "Whyline Platform",
+		PasswordHash: string(hashedPassword),
+		Role:         "admin",
+		IsVerified:   true,
+		CreatedAt:    time.Now().UTC(),
+	}
+
+	if err := s.repo.Create(user); err != nil {
+		return nil, err
+	}
+
+	token, err := s.generateToken(user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	return &AuthResponse{
+		Token: token,
+		User:  user.ToResponse(),
+	}, nil
+}
+
+// CreateCompany creates a new company in the knowledge graph (admin-only).
+func (s *Service) CreateCompany(adminUserID, name string) (*Company, error) {
+	admin, err := s.repo.FindByID(adminUserID)
+	if err != nil || admin.Role != "admin" {
+		return nil, errors.New("admin privileges required: only administrators can add companies")
+	}
+	return s.repo.CreateCompany(name)
+}
+
+// ListCompanies returns all companies available for user signup.
+func (s *Service) ListCompanies() ([]*Company, error) {
+	return s.repo.ListCompanies()
 }
 
 func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
@@ -204,6 +290,7 @@ func (s *Service) generateToken(user *User) (string, error) {
 		UserID:   user.ID,
 		Email:    user.Email,
 		Username: user.Username,
+		Company:  user.Company,
 		Role:     user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID,

@@ -41,7 +41,7 @@ func main() {
 
 	// 2. Auth dependencies
 	otpManager := auth.NewOTPManager(cfg.OTPExpiry, cfg.AppEmail, cfg.AppPassword, cfg.SMTPHost, cfg.SMTPPort)
-	authService := auth.NewService(authRepo, cfg.JWTSecret, cfg.JWTExpiry, otpManager)
+	authService := auth.NewService(authRepo, cfg.JWTSecret, cfg.JWTExpiry, otpManager, cfg.AdminSecret)
 	authHandler := auth.NewHandler(authService)
 
 	// 3. Router setup
@@ -58,7 +58,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORSAllowed,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-User-ID", "X-Company-ID"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,

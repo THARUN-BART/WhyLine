@@ -28,6 +28,9 @@ func (h *Handler) getUserID(r *http.Request, reqUserID string) string {
 	if reqUserID != "" {
 		return reqUserID
 	}
+	if headerID := r.Header.Get("X-User-ID"); headerID != "" {
+		return headerID
+	}
 	if userID, ok := auth.GetUserIDFromContext(r.Context()); ok && userID != "" {
 		return userID
 	}

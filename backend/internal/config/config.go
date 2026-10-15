@@ -24,6 +24,7 @@ type Config struct {
 	SMTPHost     string
 	SMTPPort     string
 	OTPExpiry    time.Duration
+	AdminSecret  string
 }
 
 func Load() *Config {
@@ -71,6 +72,7 @@ func Load() *Config {
 		SMTPHost:    getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:    getEnv("SMTP_PORT", "587"),
 		OTPExpiry:   otpExpiry,
+		AdminSecret: getEnv("ADMIN_SECRET", "whyline-admin-secret-2026"),
 	}
 }
 

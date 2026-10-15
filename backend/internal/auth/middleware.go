@@ -70,3 +70,15 @@ func GetClaimsFromContext(ctx context.Context) (*JWTClaims, bool) {
 	val, ok := ctx.Value(UserClaimsContextKey).(*JWTClaims)
 	return val, ok
 }
+
+// AdminMiddleware ensures that the authenticated caller has the "admin" role.
+func (s *Service) AdminMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := GetClaimsFromContext(r.Context())
+		if !ok || claims == nil || claims.Role != "admin" {
+			http.Error(w, `{"error":"forbidden: administrator access required"}`, http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

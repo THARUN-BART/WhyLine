@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -20,13 +21,22 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Post("/send-otp", h.HandleSendOTP)
 		r.Post("/verify-otp", h.HandleVerifyOTP)
 		r.Post("/register", h.HandleRegister)
+		r.Post("/admin/register", h.HandleAdminRegister)
 		r.Post("/login", h.HandleLogin)
 		r.Get("/users", h.HandleListUsers)
+		r.Get("/companies", h.HandleListCompanies) // Public: Available companies for signup select
 
-		// Protected routes
+		// Protected user routes
 		r.Group(func(r chi.Router) {
 			r.Use(h.service.Middleware)
 			r.Get("/me", h.HandleMe)
+		})
+
+		// Protected admin-only routes
+		r.Group(func(r chi.Router) {
+			r.Use(h.service.Middleware)
+			r.Use(h.service.AdminMiddleware)
+			r.Post("/companies", h.HandleCreateCompany) // Only admin can add companies
 		})
 	})
 }
@@ -125,6 +135,70 @@ func (h *Handler) HandleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"users": responses,
+	})
+}
+
+func (h *Handler) HandleAdminRegister(w http.ResponseWriter, r *http.Request) {
+	var req AdminRegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	resp, err := h.service.RegisterAdmin(req)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err == ErrUserAlreadyExists {
+			status = http.StatusConflict
+		} else if strings.Contains(err.Error(), "admin secret") {
+			status = http.StatusForbidden
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) HandleListCompanies(w http.ResponseWriter, r *http.Request) {
+	companies, err := h.service.ListCompanies()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"total":     len(companies),
+		"companies": companies,
+	})
+}
+
+func (h *Handler) HandleCreateCompany(w http.ResponseWriter, r *http.Request) {
+	var req CreateCompanyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if strings.TrimSpace(req.Name) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "company name cannot be empty"})
+		return
+	}
+
+	adminUserID, ok := GetUserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+
+	company, err := h.service.CreateCompany(adminUserID, req.Name)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Company created successfully",
+		"company": company,
 	})
 }
 

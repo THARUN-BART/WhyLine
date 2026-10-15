@@ -22,6 +22,7 @@ type OTPEntry struct {
 	Code      string
 	ExpiresAt time.Time
 	Verified  bool
+	Attempts  int
 }
 
 type OTPManager struct {
@@ -135,7 +136,17 @@ func (m *OTPManager) Verify(email, code string) error {
 		return ErrOTPExpired
 	}
 
+	if entry.Attempts >= 5 {
+		delete(m.store, normEmail)
+		return errors.New("maximum verification attempts exceeded, please request a new OTP")
+	}
+
 	if strings.TrimSpace(entry.Code) != strings.TrimSpace(code) {
+		entry.Attempts++
+		if entry.Attempts >= 5 {
+			delete(m.store, normEmail)
+			return errors.New("maximum verification attempts exceeded, please request a new OTP")
+		}
 		return ErrOTPInvalid
 	}
 

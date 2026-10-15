@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,13 +28,19 @@ func NewService(client *graph.Client, companyGraph string, toolsEngine *tools.En
 	}
 }
 
+var safeMemoryIDRegex = regexp.MustCompile(`[^a-zA-Z0-9_]+`)
+
 func (s *Service) getMemoryGraph(userID string) string {
 	cleanID := strings.TrimSpace(userID)
 	if cleanID == "" {
 		cleanID = "default"
 	}
-	// Sanitize graph name for FalkorDB key naming
 	cleanID = strings.ReplaceAll(cleanID, "-", "_")
+	cleanID = safeMemoryIDRegex.ReplaceAllString(cleanID, "_")
+	cleanID = strings.Trim(cleanID, "_")
+	if cleanID == "" {
+		cleanID = "default"
+	}
 	return "memory_" + cleanID
 }
 

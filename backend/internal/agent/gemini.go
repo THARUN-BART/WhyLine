@@ -35,7 +35,7 @@ func NewGeminiAgent(
 	validator *IDValidator,
 ) *GeminiAgent {
 	if model == "" {
-		model = "gemini-2.5-flash"
+		model = "gemini-3.8-flash"
 	}
 	return &GeminiAgent{
 		apiKey:        apiKey,
