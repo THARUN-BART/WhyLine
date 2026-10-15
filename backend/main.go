@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/THARUN-BART/whyline/backend/internal/agent"
 	"github.com/THARUN-BART/whyline/backend/internal/auth"
 	"github.com/THARUN-BART/whyline/backend/internal/config"
 	"github.com/THARUN-BART/whyline/backend/internal/graph"
@@ -94,6 +95,11 @@ func main() {
 		memoryService := memory.NewService(graphClient, "company", toolsEngine)
 		memoryHandler := memory.NewHandler(memoryService)
 		memoryHandler.RegisterRoutes(r)
+
+		validator := agent.NewIDValidator(graphClient, "company")
+		geminiAgent := agent.NewGeminiAgent(cfg.GeminiKey, cfg.GeminiModel, toolsEngine, memoryService, validator)
+		agentHandler := agent.NewHandler(geminiAgent)
+		agentHandler.RegisterRoutes(r)
 	}
 
 	// Protected test endpoint to verify JWT middleware

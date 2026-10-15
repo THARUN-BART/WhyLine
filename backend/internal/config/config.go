@@ -17,10 +17,8 @@ type Config struct {
 	FalkorPort   string
 	FalkorPass   string
 	CORSAllowed  []string
-	LLMProvider  string
-	OpenAIKey    string
 	GeminiKey    string
-	LLMModel     string
+	GeminiModel  string
 	AppEmail     string
 	AppPassword  string
 	SMTPHost     string
@@ -66,10 +64,8 @@ func Load() *Config {
 		FalkorPort:  falkorPort,
 		FalkorPass:  falkorPass,
 		CORSAllowed: corsAllowed,
-		LLMProvider: getEnv("LLM_PROVIDER", "openai"),
-		OpenAIKey:   getEnv("OPENAI_API_KEY", ""),
 		GeminiKey:   getEnv("GEMINI_API_KEY", ""),
-		LLMModel:    getEnv("LLM_MODEL", "gpt-4o-mini"),
+		GeminiModel: getEnv("GEMINI_MODEL", "gemini-3.8-flash"),
 		AppEmail:    getEnv("APP_EMAIL", ""),
 		AppPassword: getEnv("APP_PASSWORD", ""),
 		SMTPHost:    getEnv("SMTP_HOST", "smtp.gmail.com"),
