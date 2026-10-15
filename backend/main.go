@@ -16,7 +16,6 @@ import (
 	"github.com/THARUN-BART/whyline/backend/internal/graph"
 	"github.com/THARUN-BART/whyline/backend/internal/memory"
 	"github.com/THARUN-BART/whyline/backend/internal/rag"
-	"github.com/THARUN-BART/whyline/backend/internal/seed"
 	"github.com/THARUN-BART/whyline/backend/internal/ticket"
 	"github.com/THARUN-BART/whyline/backend/internal/tools"
 	"github.com/go-chi/chi/v5"
@@ -118,11 +117,6 @@ func main() {
 			ragHandler := rag.NewHandler(ragService)
 			ragHandler.RegisterRoutes(sub)
 		})
-
-		seeder := seed.NewSeeder(graphClient, graphName)
-		_ = seeder.CheckAndAutoSeed(context.Background())
-		seedHandler := seed.NewHandler(seeder)
-		seedHandler.RegisterRoutes(r)
 	}
 
 	// Strictly protected endpoints requiring authentication + company approval

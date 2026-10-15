@@ -45,6 +45,14 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.TrimSpace(req.Question) == "" {
+		if strings.TrimSpace(req.Prompt) != "" {
+			req.Question = req.Prompt
+		} else if strings.TrimSpace(req.Message) != "" {
+			req.Question = req.Message
+		}
+	}
+
+	if strings.TrimSpace(req.Question) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "question cannot be empty"})
 		return
 	}

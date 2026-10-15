@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/THARUN-BART/whyline/backend/internal/seed"
 )
 
 var wordRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
@@ -22,15 +21,15 @@ type Vectorizer struct {
 	httpClient *http.Client
 
 	// In-memory TF-IDF index
-	mu          sync.RWMutex
-	vocabulary  map[string]int     // term -> index
-	idf         []float64          // term index -> idf weight
-	numDocs     int
-	chunks      []Chunk
-	useGemini   bool
+	mu         sync.RWMutex
+	vocabulary map[string]int // term -> index
+	idf        []float64      // term index -> idf weight
+	numDocs    int
+	chunks     []Chunk
+	useGemini  bool
 }
 
-// NewVectorizer creates and initializes the text vectorizer over seed data.
+// NewVectorizer creates and initializes the text vectorizer.
 func NewVectorizer(geminiKey string) *Vectorizer {
 	v := &Vectorizer{
 		geminiKey: geminiKey,
@@ -38,83 +37,18 @@ func NewVectorizer(geminiKey string) *Vectorizer {
 			Timeout: 10 * time.Second,
 		},
 		vocabulary: make(map[string]int),
+		chunks:     make([]Chunk, 0),
 		useGemini:  geminiKey != "",
 	}
-
-	// 1. Ingest seed chunks
-	v.ingestSeedChunks()
-
-	// 2. Build local TF-IDF vocabulary and IDF weights
-	v.buildTFIDF()
-
-	// 3. Compute in-memory vector embeddings for all chunks
-	v.embedAllChunks()
 
 	return v
 }
 
-// ingestSeedChunks converts seed tickets, threads, documents, and decisions into searchable text chunks.
-func (v *Vectorizer) ingestSeedChunks() {
-	var chunks []Chunk
-
-	// Decisions
-	for _, d := range seed.DefaultDecisions {
-		chunks = append(chunks, Chunk{
-			ID:         "chk_" + d.ID,
-			SourceType: "Decision",
-			SourceID:   d.ID,
-			Title:      d.Title,
-			Content:    fmt.Sprintf("%s. Status: %s. Date: %s. Summary: %s. Aliases: %s", d.Title, d.Status, d.Date, d.Summary, strings.Join(d.Aliases, ", ")),
-			Metadata: map[string]string{
-				"date":   d.Date,
-				"status": d.Status,
-			},
-		})
-	}
-
-	// Tickets
-	for _, t := range seed.DefaultTickets {
-		chunks = append(chunks, Chunk{
-			ID:         "chk_" + strings.ToLower(t.ID),
-			SourceType: "Ticket",
-			SourceID:   t.ID,
-			Title:      t.Title,
-			Content:    fmt.Sprintf("%s. %s URL: %s", t.Title, t.Description, t.URL),
-			Metadata: map[string]string{
-				"url": t.URL,
-			},
-		})
-	}
-
-	// Slack Threads
-	for _, th := range seed.DefaultThreads {
-		chunks = append(chunks, Chunk{
-			ID:         "chk_" + strings.ToLower(th.ID),
-			SourceType: "Thread",
-			SourceID:   th.ID,
-			Title:      fmt.Sprintf("Thread %s (%s)", th.ID, th.Channel),
-			Content:    fmt.Sprintf("Slack channel %s: %s. Excerpt: %s. Discussion Body: %s", th.Channel, th.Excerpt, th.Excerpt, th.Body),
-			Metadata: map[string]string{
-				"channel": th.Channel,
-			},
-		})
-	}
-
-	// Documents / RFCs
-	for _, doc := range seed.DefaultDocuments {
-		chunks = append(chunks, Chunk{
-			ID:         "chk_" + strings.ToLower(doc.ID),
-			SourceType: "Document",
-			SourceID:   doc.ID,
-			Title:      doc.Title,
-			Content:    fmt.Sprintf("%s. URL: %s. Document text: %s", doc.Title, doc.URL, doc.Text),
-			Metadata: map[string]string{
-				"url": doc.URL,
-			},
-		})
-	}
-
+// SetChunks updates the text chunks and rebuilds the vector index.
+func (v *Vectorizer) SetChunks(chunks []Chunk) {
 	v.chunks = chunks
+	v.buildTFIDF()
+	v.embedAllChunks()
 }
 
 func tokenize(text string) []string {

@@ -22,6 +22,8 @@ type AgentStep struct {
 type ChatRequest struct {
 	UserID   string `json:"user_id,omitempty"`
 	Question string `json:"question"`
+	Prompt   string `json:"prompt,omitempty"`
+	Message  string `json:"message,omitempty"`
 	Stream   bool   `json:"stream,omitempty"`
 }
 

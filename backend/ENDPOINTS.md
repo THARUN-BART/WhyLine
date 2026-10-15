@@ -12,11 +12,10 @@ All endpoints return and accept JSON unless specified otherwise (e.g. SSE stream
 3. [Company Management & Approval Flow (`/api/auth/company`)](#3-company-management--approval-flow-apiauthcompany)
 4. [Engineering Tickets API (`/api/tickets`)](#4-engineering-tickets-api-apitickets)
 5. [FalkorDB Graph Operations (`/api/graph`)](#5-falkordb-graph-operations-apigraph)
-6. [Synthetic Data Seeding (`/api/seed`)](#6-synthetic-data-seeding-apiseed)
-7. [Graph Query Tools Layer (`/api/tools`)](#7-graph-query-tools-layer-apitools)
-8. [Per-User Memory Graph (`/api/memory`)](#8-per-user-memory-graph-apimemory)
-9. [Google Gemini Agent & SSE Stream (`/api/agent`)](#9-google-gemini-agent--sse-stream-apiagent)
-10. [Vs-RAG Baseline Comparison (`/api/rag`)](#10-vs-rag-baseline-comparison-apirag)
+6. [Graph Query Tools Layer (`/api/tools`)](#6-graph-query-tools-layer-apitools)
+7. [Per-User Memory Graph (`/api/memory`)](#7-per-user-memory-graph-apimemory)
+8. [Google Gemini Agent & SSE Stream (`/api/agent`)](#8-google-gemini-agent--sse-stream-apiagent)
+9. [Vs-RAG Baseline Comparison (`/api/rag`)](#9-vs-rag-baseline-comparison-apirag)
 
 ---
 
@@ -451,31 +450,7 @@ curl -s -X POST http://localhost:8080/api/graph/reset
 
 ---
 
-## 6. Synthetic Data Seeding (`/api/seed`)
-
-### `POST /api/seed/load`
-Idempotently loads 68 nodes, 58 edges, and deliberate architectural edge cases (honest gaps, departed owners, orphaned services).
-```bash
-curl -s -X POST http://localhost:8080/api/seed/load
-```
-**Response (200 OK):**
-```json
-{
-  "message": "Graph successfully seeded",
-  "nodes_created": 68,
-  "edges_created": 58
-}
-```
-
-### `POST /api/seed/reset`
-Clears graph nodes without reseeding.
-```bash
-curl -s -X POST http://localhost:8080/api/seed/reset
-```
-
----
-
-## 7. Graph Query Tools Layer (`/api/tools`)
+## 6. Graph Query Tools Layer (`/api/tools`)
 
 These tools are invoked deterministically by the Gemini Agent or called directly by the UI.
 
