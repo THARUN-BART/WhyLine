@@ -15,7 +15,7 @@ export default function DecisionsListPage() {
       try {
         const res = await api.queryGraph(
           `MATCH (d:Decision) 
-           OPTIONAL MATCH (d)-[:DECIDED_BY]->(p:Person)
+           OPTIONAL MATCH (p:Person)-[:DECIDED]->(d)
            OPTIONAL MATCH (d)-[:AFFECTS]->(s:System)
            RETURN d.id AS id, d.title AS title, d.date AS date, d.status AS status, 
                   p.name AS decider, s.name AS system`

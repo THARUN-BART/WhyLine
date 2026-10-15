@@ -16,7 +16,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email/username or password")
 	ErrInvalidToken       = errors.New("invalid or expired authentication token")
 	ErrEmptyFields        = errors.New("email, username, and password are required")
-	ErrPasswordTooShort   = errors.New("password must be at least 6 characters")
+	ErrPasswordTooShort   = errors.New("password must be at least 12 characters")
 	ErrEmailNotVerified   = errors.New("email not verified: please verify your email with OTP first")
 )
 
@@ -39,9 +39,6 @@ type Service struct {
 }
 
 func NewService(repo Repository, jwtSecret string, jwtExpiry time.Duration, otpManager *OTPManager, adminSecret string) *Service {
-	if adminSecret == "" {
-		adminSecret = "whyline-admin-secret-2026"
-	}
 	return &Service{
 		repo:        repo,
 		jwtSecret:   []byte(jwtSecret),
@@ -81,15 +78,19 @@ func (s *Service) Register(req RegisterRequest) (*AuthResponse, error) {
 	email := strings.TrimSpace(req.Email)
 	username := strings.TrimSpace(req.Username)
 	password := strings.TrimSpace(req.Password)
+	company := strings.TrimSpace(req.Company)
 
 	if email == "" || username == "" || password == "" {
 		return nil, ErrEmptyFields
 	}
-	if len(password) < 6 {
+	// Security fix #17: max input length to prevent memory exhaustion
+	if len(email) > 254 || len(username) > 50 || len(company) > 100 {
+		return nil, errors.New("input too long: email max 254, username max 50, company max 100 characters")
+	}
+	if len(password) < 12 {
 		return nil, ErrPasswordTooShort
 	}
 
-	company := strings.TrimSpace(req.Company)
 	if company == "" {
 		return nil, errors.New("company is required: please select from available registered companies")
 	}
@@ -159,7 +160,7 @@ func (s *Service) RegisterAdmin(req AdminRegisterRequest) (*AuthResponse, error)
 	if email == "" || username == "" || password == "" {
 		return nil, ErrEmptyFields
 	}
-	if len(password) < 6 {
+	if len(password) < 12 {
 		return nil, ErrPasswordTooShort
 	}
 	if secret == "" || secret != s.adminSecret {
@@ -214,7 +215,7 @@ func (s *Service) AdminCreateCompanyAndUser(callerAdminID string, req AdminCreat
 	if companyName == "" || email == "" || username == "" || password == "" {
 		return nil, ErrEmptyFields
 	}
-	if len(password) < 6 {
+	if len(password) < 12 {
 		return nil, ErrPasswordTooShort
 	}
 
@@ -276,7 +277,7 @@ func (s *Service) ApproveCompanyUser(callerUserID string, targetUserID string, s
 
 	// Check permissions: platform admin can approve any user; company_admin can approve users of their company
 	if caller.Role != "admin" {
-		if caller.Role != "company_admin" && !strings.Contains(caller.Role, "admin") {
+		if caller.Role != "company_admin" {
 			return nil, errors.New("forbidden: only company main users or platform admins can approve employee accounts")
 		}
 		if !strings.EqualFold(caller.Company, target.Company) {
@@ -399,15 +400,8 @@ func (s *Service) Login(req LoginRequest) (*AuthResponse, error) {
 		return nil, ErrInvalidCredentials
 	}
 
-	// Verify password: check bcrypt hash first, or plaintext match for direct DB inserts
-	passwordMatch := false
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err == nil {
-		passwordMatch = true
-	} else if user.PasswordHash == password {
-		passwordMatch = true
-	}
-
-	if !passwordMatch {
+	// Verify password using bcrypt only — plaintext comparison is never allowed
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
 

@@ -26,28 +26,30 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 }
 
 func (h *Handler) getUserID(r *http.Request) string {
-	// First check authenticated JWT context
+	// Security fix #8: always derive userID from validated JWT context only
+	// Never trust user-supplied query params or body fields for identity
 	if userID, ok := auth.GetUserIDFromContext(r.Context()); ok && userID != "" {
 		return userID
 	}
-	// Fall back to query param ?user_id=... (useful for demo user picker)
-	if qID := r.URL.Query().Get("user_id"); qID != "" {
-		return qID
-	}
-	return "usr_demo"
+	return ""
 }
 
 func (h *Handler) HandleRecall(w http.ResponseWriter, r *http.Request) {
 	userID := h.getUserID(r)
+	if userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
 	summary, err := h.service.RecallMemory(r.Context(), userID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to recall memory"})
 		return
 	}
 	writeJSON(w, http.StatusOK, summary)
 }
 
 func (h *Handler) HandleSaveQuestion(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
 	var req SaveQuestionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
@@ -59,13 +61,16 @@ func (h *Handler) HandleSaveQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.UserID == "" {
-		req.UserID = h.getUserID(r)
+	// Security fix #8: always use JWT-authenticated userID — ignore any user_id in body
+	userID := h.getUserID(r)
+	if userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
 	}
 
-	record, err := h.service.SaveQuestion(r.Context(), req.UserID, req.Question, req.Entities)
+	record, err := h.service.SaveQuestion(r.Context(), userID, req.Question, req.Entities)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to save question"})
 		return
 	}
 
@@ -73,19 +78,24 @@ func (h *Handler) HandleSaveQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleSimulateChange(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
 	var req SimulateChangeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 		return
 	}
 
-	if req.UserID == "" {
-		req.UserID = h.getUserID(r)
+	// Security fix #8: always use JWT-authenticated userID — ignore body user_id
+	userID := h.getUserID(r)
+	if userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
 	}
+	req.UserID = userID
 
 	simulation, err := h.service.SimulateChange(r.Context(), req)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to simulate change"})
 		return
 	}
 
@@ -94,13 +104,17 @@ func (h *Handler) HandleSimulateChange(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HandleReset(w http.ResponseWriter, r *http.Request) {
 	userID := h.getUserID(r)
+	if userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
 	if err := h.service.ResetMemory(r.Context(), userID); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to reset memory"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "Memory graph for user " + userID + " reset successfully",
+		"message": "Memory graph reset successfully",
 	})
 }
 

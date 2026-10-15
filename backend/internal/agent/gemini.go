@@ -94,7 +94,8 @@ func (a *GeminiAgent) executeGeminiLoop(
 	steps []AgentStep,
 	start time.Time,
 ) (*ChatResponse, error) {
-	apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", a.model, a.apiKey)
+	// Fix #11: Use header-based API key instead of URL query param to avoid key leakage in logs.
+	apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", a.model)
 
 	// Construct system instruction and function declarations
 	systemPrompt := `You are Whyline, an enterprise AI agent built for Graph Hacks that reasons exclusively over a FalkorDB company graph.
@@ -203,6 +204,7 @@ RULES:
 			return nil, err
 		}
 		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("x-goog-api-key", a.apiKey)
 
 		resp, err := a.httpClient.Do(httpReq)
 		if err != nil {

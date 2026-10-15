@@ -54,7 +54,9 @@ export default function TicketDetailPage() {
         const res = await api.queryGraph(
           `MATCH (t:Ticket {id: '${ticketId}'})
            OPTIONAL MATCH (d:Decision)-[:APPROVED_IN]->(t)
-           RETURN t.id AS id, t.title AS title, t.url AS url, d.id AS decision_id, d.title AS decision_title`
+           OPTIONAL MATCH (p:Person)-[:DECIDED]->(d)
+           RETURN t.id AS id, t.title AS title, t.url AS url, t.priority AS priority, t.status AS status, 
+                  t.description AS description, d.id AS decision_id, d.title AS decision_title, p.name AS assignee`
         );
         if (res && res.records && res.records.length > 0) {
           const rec = res.records[0];
@@ -63,6 +65,9 @@ export default function TicketDetailPage() {
             id: rec.id || ticketId,
             title: rec.title || prev.title,
             url: rec.url || prev.url,
+            priority: rec.priority || prev.priority,
+            status: rec.status || prev.status,
+            assignee: rec.assignee || prev.assignee,
             decision_id: rec.decision_id || prev.decision_id,
             decision_title: rec.decision_title || prev.decision_title,
           }));
@@ -109,15 +114,17 @@ export default function TicketDetailPage() {
               <span className="material-symbols-outlined text-sm">alt_route</span>
               <span>Inspect Linked Decision ADR</span>
             </Link>
-            <a
-              href={ticketData.url || '#'}
-              target="_blank"
-              rel="noreferrer"
-              className="px-space-md py-space-xs rounded-lg bg-surface-container text-on-surface font-headline-sm text-xs font-semibold hover:bg-surface-container-high transition-colors shadow-sm flex items-center gap-1.5 border border-outline-variant/30"
-            >
-              <span className="material-symbols-outlined text-sm">open_in_new</span>
-              <span>Open in Jira</span>
-            </a>
+            {ticketData.url && (ticketData.url.startsWith('https://') || ticketData.url.startsWith('http://')) ? (
+              <a
+                href={ticketData.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-space-md py-space-xs rounded-lg bg-surface-container text-on-surface font-headline-sm text-xs font-semibold hover:bg-surface-container-high transition-colors shadow-sm flex items-center gap-1.5 border border-outline-variant/30"
+              >
+                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                <span>Open in Jira</span>
+              </a>
+            ) : null}
           </div>
         </div>
 

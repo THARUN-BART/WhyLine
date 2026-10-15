@@ -50,7 +50,7 @@ export default function GraphExplorerPage() {
     {
       title: 'Decider Authorship Hierarchy',
       cypher:
-        'MATCH (d:Decision)-[:DECIDED_BY]->(p:Person) RETURN p.name AS decider, p.role AS role, d.title AS decision LIMIT 10',
+        'MATCH (p:Person)-[:DECIDED]->(d:Decision) RETURN p.name AS decider, p.role AS role, d.title AS decision LIMIT 10',
     },
     {
       title: 'System Dependencies Mesh',

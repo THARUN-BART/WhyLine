@@ -41,7 +41,8 @@ func NewClientWithAuth(host, port, username, password string, useTLS bool) (*Cli
 				opts = append(opts, redis.DialPassword(password))
 			}
 			if useTLS {
-				opts = append(opts, redis.DialUseTLS(true), redis.DialTLSSkipVerify(true))
+				// Security fix #3: TLS certificate verification is enforced — DialTLSSkipVerify removed
+				opts = append(opts, redis.DialUseTLS(true))
 			}
 
 			c, err := redis.Dial("tcp", addr, opts...)

@@ -34,7 +34,7 @@ func (h *Handler) HandleFindEntity(w http.ResponseWriter, r *http.Request) {
 
 	matches, err := h.engine.FindEntity(r.Context(), q)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to search entities"})
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *Handler) HandleTraceDecision(w http.ResponseWriter, r *http.Request) {
 
 	trace, err := h.engine.TraceDecision(r.Context(), id)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "decision not found"})
 		return
 	}
 
@@ -69,7 +69,7 @@ func (h *Handler) HandleImpactOf(w http.ResponseWriter, r *http.Request) {
 
 	impact, err := h.engine.ImpactOf(r.Context(), id)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to analyze impact"})
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *Handler) HandleWhoKnows(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.engine.WhoKnows(r.Context(), system)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to retrieve system contributors"})
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *Handler) HandleBusFactor(w http.ResponseWriter, r *http.Request) {
 	system := r.URL.Query().Get("system")
 	report, err := h.engine.BusFactor(r.Context(), system)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to compute bus factor"})
 		return
 	}
 

@@ -44,9 +44,28 @@ const UserContext = createContext<UserContextType>({
 });
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem('whyline_user');
+      if (userStr) {
+        try {
+          return JSON.parse(userStr);
+        } catch {
+          return null;
+        }
+      }
+    }
+    return null;
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('whyline_token');
+    }
+    return null;
+  });
+
+  const [authInitialized] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [graphStats, setGraphStats] = useState<{ total_nodes: number; total_edges: number } | null>(null);
@@ -74,30 +93,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    let savedToken: string | null = null;
-    let savedUser: User | null = null;
-
-    if (typeof window !== 'undefined') {
-      savedToken = localStorage.getItem('whyline_token');
-      const userStr = localStorage.getItem('whyline_user');
-      if (savedToken) setToken(savedToken);
-      if (userStr) {
-        try {
-          savedUser = JSON.parse(userStr);
-          setCurrentUser(savedUser);
-        } catch {
-          // ignore
-        }
-      }
-    }
-    setAuthInitialized(true);
+    const savedToken = token;
+    const savedUser = currentUser;
 
     async function loadData() {
       // Always refresh companies for signup dropdown
       refreshCompanies();
 
-      // Only fetch users list and graph stats if an authenticated session exists
-      if (savedToken) {
+      // Only fetch users list if an authenticated admin session exists
+      if (savedToken && savedUser?.role === 'admin') {
         try {
           const res = await api.getUsers();
           if (res && res.users && res.users.length > 0) {
@@ -106,6 +110,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // ignore
         }
+      }
+      if (savedToken) {
         refreshStats();
       }
     }
@@ -120,12 +126,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('whyline_token', res.token);
       localStorage.setItem('whyline_user', JSON.stringify(res.user));
     }
-    // Refresh user list from backend
-    try {
-      const usersRes = await api.getUsers();
-      if (usersRes?.users) setUsers(usersRes.users);
-    } catch {
-      // ignore
+    // Refresh user list if admin
+    if (res.user?.role === 'admin') {
+      try {
+        const usersRes = await api.getUsers();
+        if (usersRes?.users) setUsers(usersRes.users);
+      } catch {
+        // ignore
+      }
     }
     refreshCompanies();
     return res.user;
@@ -135,12 +143,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const res = await api.register(payload);
     setToken(res.token);
     setCurrentUser(res.user);
-    // Refresh user list and companies from backend
-    try {
-      const usersRes = await api.getUsers();
-      if (usersRes?.users) setUsers(usersRes.users);
-    } catch {
-      // ignore
+    if (res.user?.role === 'admin') {
+      try {
+        const usersRes = await api.getUsers();
+        if (usersRes?.users) setUsers(usersRes.users);
+      } catch {
+        // ignore
+      }
     }
     refreshCompanies();
   };

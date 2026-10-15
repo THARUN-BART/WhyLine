@@ -107,8 +107,8 @@ func (m *OTPManager) SendEmail(toEmail, code string) error {
 </html>`, m.appEmail, normEmail, subject, code)
 
 	if m.appEmail == "" || m.appPassword == "" {
-		log.Printf("[WARN] SMTP credentials not set (APP_EMAIL or APP_PASSWORD empty). OTP for %s is [%s]", normEmail, code)
-		return nil
+		// Security fix #7: never log OTP codes — return error so caller handles it gracefully
+		return fmt.Errorf("SMTP credentials not configured (APP_EMAIL / APP_PASSWORD): cannot send OTP email")
 	}
 
 	auth := smtp.PlainAuth("", m.appEmail, m.appPassword, m.smtpHost)
@@ -116,7 +116,8 @@ func (m *OTPManager) SendEmail(toEmail, code string) error {
 
 	err := smtp.SendMail(addr, auth, m.appEmail, []string{normEmail}, []byte(body))
 	if err != nil {
-		log.Printf("[WARN] Failed to send email via SMTP (%v). Fallback DEV OTP for %s is [%s]", err, normEmail, code)
+		// Security fix #7: do not log the OTP code on failure
+		log.Printf("[WARN] Failed to send OTP email via SMTP to %s: %v", normEmail, err)
 		return err
 	}
 

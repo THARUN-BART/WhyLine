@@ -3,31 +3,35 @@ package config
 import (
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 )
 
+// graphNameRegex enforces safe graph names: alphanumeric and underscores only.
+var graphNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
 type Config struct {
-	Port         string
-	JWTSecret    string
-	JWTExpiry    time.Duration
-	FalkorHost   string
-	FalkorPort   string
-	FalkorUser   string
-	FalkorPass   string
-	FalkorGraph  string
-	FalkorTLS    bool
-	CORSAllowed  []string
-	GeminiKey    string
-	GeminiModel  string
-	AppEmail     string
-	AppPassword  string
-	SMTPHost     string
-	SMTPPort     string
-	OTPExpiry    time.Duration
-	AdminSecret  string
+	Port        string
+	JWTSecret   string
+	JWTExpiry   time.Duration
+	FalkorHost  string
+	FalkorPort  string
+	FalkorUser  string
+	FalkorPass  string
+	FalkorGraph string
+	FalkorTLS   bool
+	CORSAllowed []string
+	GeminiKey   string
+	GeminiModel string
+	AppEmail    string
+	AppPassword string
+	SMTPHost    string
+	SMTPPort    string
+	OTPExpiry   time.Duration
+	AdminSecret string
 }
 
 func Load() *Config {
@@ -36,8 +40,18 @@ func Load() *Config {
 		log.Println("[INFO] No .env file found or error loading, using system environment")
 	}
 
+	// Fix #1: Require JWT_SECRET and ADMIN_SECRET — crash at startup if missing.
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("[FATAL] JWT_SECRET environment variable is required but not set")
+	}
+
+	adminSecret := os.Getenv("ADMIN_SECRET")
+	if adminSecret == "" {
+		log.Fatal("[FATAL] ADMIN_SECRET environment variable is required but not set")
+	}
+
 	port := getEnv("PORT", "8080")
-	jwtSecret := getEnv("JWT_SECRET", "whyline-dev-super-secret-jwt-token-key-2026")
 	jwtExpiryStr := getEnv("JWT_EXPIRY", "24h")
 	jwtExpiry, err := time.ParseDuration(jwtExpiryStr)
 	if err != nil {
@@ -73,6 +87,11 @@ func Load() *Config {
 	falkorTLSStr := strings.ToLower(getEnv("FALKORDB_TLS", "false"))
 	falkorTLS := falkorTLSStr == "true" || falkorTLSStr == "1" || strings.HasPrefix(falkorEndpoint, "rediss://") || falkorPort == "6380"
 
+	// Fix #20: Validate graph name to prevent injection via environment variable.
+	if !graphNameRegex.MatchString(falkorGraph) {
+		log.Fatalf("[FATAL] FALKORDB_GRAPH value %q is invalid: only alphanumeric characters and underscores are allowed", falkorGraph)
+	}
+
 	corsStr := getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
 	corsAllowed := strings.Split(corsStr, ",")
 	for i := range corsAllowed {
@@ -103,7 +122,7 @@ func Load() *Config {
 		SMTPHost:    getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:    getEnv("SMTP_PORT", "587"),
 		OTPExpiry:   otpExpiry,
-		AdminSecret: getEnv("ADMIN_SECRET", "whyline-admin-secret-2026"),
+		AdminSecret: adminSecret,
 	}
 }
 
@@ -113,3 +132,4 @@ func getEnv(key, defaultVal string) string {
 	}
 	return defaultVal
 }
+

@@ -142,7 +142,7 @@ export interface RagCompareResult {
   verdict: string;
   why_graph_wins: string;
   rag: {
-    retrieved_chunks?: any[];
+    retrieved_chunks?: Array<Record<string, unknown>>;
     answer: string;
     blindspots?: string[];
   };
@@ -162,8 +162,8 @@ export interface AgentChatResponse {
   steps?: Array<{
     type: string;
     name?: string;
-    input?: any;
-    output?: any;
+    input?: unknown;
+    output?: unknown;
     content?: string;
   }>;
   cited_node_ids?: string[];
@@ -291,47 +291,86 @@ class ApiClient {
   }
 
   async getUsers(): Promise<{ users: User[] }> {
-    const res = await fetch(`${API_BASE}/api/auth/users`);
+    const res = await fetch(`${API_BASE}/api/auth/users`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      return { users: [] };
+    }
     return res.json();
   }
 
   async getGraphStats(): Promise<GraphStats> {
-    const res = await fetch(`${API_BASE}/api/graph/stats`);
+    const res = await fetch(`${API_BASE}/api/graph/stats`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      return { graph: 'company', status: 'unknown', total_nodes: 0, total_edges: 0 };
+    }
     return res.json();
   }
 
-  async queryGraph(query: string): Promise<{ columns: string[]; records: any[] }> {
+  async queryGraph<T = any>(query: string): Promise<{ columns: string[]; records: T[] }> {
     const res = await fetch(`${API_BASE}/api/graph/query`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ query }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Query failed' }));
+      throw new Error(err.error || 'Query failed');
+    }
     return res.json();
   }
 
   async findEntity(q: string): Promise<EntitySearchResult[]> {
-    const res = await fetch(`${API_BASE}/api/tools/find-entity?q=${encodeURIComponent(q)}`);
-    return res.json();
+    const res = await fetch(`${API_BASE}/api/tools/find-entity?q=${encodeURIComponent(q)}`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      return [];
+    }
+    const data = await res.json();
+    return data.matches || (Array.isArray(data) ? data : []);
   }
 
   async traceDecision(id: string): Promise<DecisionTrace> {
-    const res = await fetch(`${API_BASE}/api/tools/trace-decision?id=${encodeURIComponent(id)}`);
+    const res = await fetch(`${API_BASE}/api/tools/trace-decision?id=${encodeURIComponent(id)}`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to trace decision: ${res.statusText}`);
+    }
     return res.json();
   }
 
   async impactOf(id: string): Promise<ImpactAnalysisResult> {
-    const res = await fetch(`${API_BASE}/tools/impact-of?id=${encodeURIComponent(id)}`).catch(() => null)
-      || await fetch(`${API_BASE}/api/tools/impact-of?id=${encodeURIComponent(id)}`);
+    const res = await fetch(`${API_BASE}/api/tools/impact-of?id=${encodeURIComponent(id)}`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch impact analysis: ${res.statusText}`);
+    }
     return res.json();
   }
 
   async whoKnows(system: string): Promise<WhoKnowsResult> {
-    const res = await fetch(`${API_BASE}/api/tools/who-knows?system=${encodeURIComponent(system)}`);
+    const res = await fetch(`${API_BASE}/api/tools/who-knows?system=${encodeURIComponent(system)}`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch contributors: ${res.statusText}`);
+    }
     return res.json();
   }
 
   async getBusFactor(): Promise<BusFactorReport> {
-    const res = await fetch(`${API_BASE}/api/tools/bus-factor`);
+    const res = await fetch(`${API_BASE}/api/tools/bus-factor`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to fetch bus factor report: ${res.statusText}`);
+    }
     return res.json();
   }
 
@@ -339,6 +378,9 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/api/memory`, {
       headers: this.getHeaders(userId),
     });
+    if (!res.ok) {
+      return null;
+    }
     return res.json();
   }
 
@@ -348,11 +390,20 @@ class ApiClient {
       headers: this.getHeaders(userId),
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Simulation failed' }));
+      throw new Error(err.error || 'Simulation failed');
+    }
     return res.json();
   }
 
   async getRagPresets(): Promise<{ presets: RagPreset[] }> {
-    const res = await fetch(`${API_BASE}/api/rag/presets`);
+    const res = await fetch(`${API_BASE}/api/rag/presets`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      return { presets: [] };
+    }
     return res.json();
   }
 
@@ -362,6 +413,10 @@ class ApiClient {
       headers: this.getHeaders(),
       body: JSON.stringify(preset_id ? { preset_id } : { question }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Comparison failed' }));
+      throw new Error(err.error || 'Comparison failed');
+    }
     return res.json();
   }
 
@@ -369,8 +424,12 @@ class ApiClient {
     const res = await fetch(`${API_BASE}/api/agent/chat`, {
       method: 'POST',
       headers: this.getHeaders(userId),
-      body: JSON.stringify({ prompt, user_id: userId }),
+      body: JSON.stringify({ question: prompt, prompt, user_id: userId }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Agent inquiry failed' }));
+      throw new Error(err.error || 'Agent inquiry failed');
+    }
     return res.json();
   }
 

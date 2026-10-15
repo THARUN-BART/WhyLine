@@ -25,19 +25,17 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 }
 
 func (h *Handler) getUserID(r *http.Request, reqUserID string) string {
-	if reqUserID != "" {
-		return reqUserID
-	}
-	if headerID := r.Header.Get("X-User-ID"); headerID != "" {
-		return headerID
-	}
+	// Fix #8: Only read userID from JWT context — never from query params or anonymous defaults.
 	if userID, ok := auth.GetUserIDFromContext(r.Context()); ok && userID != "" {
 		return userID
 	}
-	return "usr_demo"
+	return ""
 }
 
 func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
+	// Fix #10: Limit request body to 1MB.
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	var req ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON request body"})
@@ -58,6 +56,10 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := h.getUserID(r, req.UserID)
+	if userID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
 
 	// Check if SSE streaming is requested
 	isSSE := req.Stream || strings.Contains(r.Header.Get("Accept"), "text/event-stream")
@@ -70,7 +72,8 @@ func (h *Handler) HandleChat(w http.ResponseWriter, r *http.Request) {
 	// Standard synchronous JSON response
 	response, err := h.agent.Ask(r.Context(), userID, req.Question, nil)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		// Fix #18: Do not expose internal error details to the client.
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "agent request failed"})
 		return
 	}
 
@@ -97,7 +100,8 @@ func (h *Handler) handleSSEChat(w http.ResponseWriter, r *http.Request, userID, 
 
 	response, err := h.agent.Ask(r.Context(), userID, question, onStep)
 	if err != nil {
-		errData, _ := json.Marshal(map[string]string{"error": err.Error()})
+		// Fix #18: Do not expose internal error details over SSE.
+		errData, _ := json.Marshal(map[string]string{"error": "agent request failed"})
 		_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", string(errData))
 		flusher.Flush()
 		return

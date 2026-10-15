@@ -37,6 +37,7 @@ func (h *Handler) RegisterRoutes(r chi.Router, authMiddleware func(http.Handler)
 
 // HandleCreateTicket handles POST /api/tickets
 func (h *Handler) HandleCreateTicket(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
 	var req CreateTicketRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
@@ -62,7 +63,7 @@ func (h *Handler) HandleCreateTicket(w http.ResponseWriter, r *http.Request) {
 
 	ticket, err := h.service.CreateTicket(r.Context(), userID, company, req)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create ticket"})
 		return
 	}
 
@@ -71,20 +72,19 @@ func (h *Handler) HandleCreateTicket(w http.ResponseWriter, r *http.Request) {
 
 // HandleListTickets handles GET /api/tickets
 func (h *Handler) HandleListTickets(w http.ResponseWriter, r *http.Request) {
+	// Security fix #6: company filter is always derived from JWT claims — never from query string
 	companyFilter := ""
 	if claims, ok := auth.GetClaimsFromContext(r.Context()); ok && claims != nil {
 		if claims.Role != "admin" {
+			// Non-admins can only see their own company's tickets
 			companyFilter = claims.Company
 		}
-	}
-	// Query param override if specified
-	if qCompany := r.URL.Query().Get("company"); qCompany != "" {
-		companyFilter = qCompany
+		// Platform admins may see all tickets (companyFilter stays "")
 	}
 
 	tickets, err := h.service.ListTickets(r.Context(), companyFilter)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list tickets"})
 		return
 	}
 
@@ -108,7 +108,8 @@ func (h *Handler) HandleGetTicket(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "ticket not found"})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		// Fix #18: Mask internal database/driver error details
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to retrieve ticket"})
 		return
 	}
 
@@ -117,6 +118,7 @@ func (h *Handler) HandleGetTicket(w http.ResponseWriter, r *http.Request) {
 
 // HandleUpdateTicket handles PUT /api/tickets/{id}
 func (h *Handler) HandleUpdateTicket(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing ticket id"})
@@ -135,7 +137,8 @@ func (h *Handler) HandleUpdateTicket(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "ticket not found"})
 			return
 		}
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		// Fix #18: Mask internal error details
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update ticket"})
 		return
 	}
 

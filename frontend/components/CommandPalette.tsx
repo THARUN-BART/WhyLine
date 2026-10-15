@@ -18,16 +18,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      setQuery('');
-      setResults([]);
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults([]);
       return;
     }
 
@@ -48,6 +45,14 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   if (!isOpen) return null;
 
+  const displayedResults = query.trim() ? results : [];
+
+  const handleClose = () => {
+    setQuery('');
+    setResults([]);
+    onClose();
+  };
+
   const handleSelect = (item: EntitySearchResult) => {
     onClose();
     if (item.label === 'Decision') {
@@ -67,7 +72,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-24 px-4 animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-24 px-4 animate-in fade-in duration-150"
+      onClick={handleClose}
+    >
       <div
         className="w-full max-w-2xl bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -81,8 +89,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') onClose();
-              if (e.key === 'Enter' && query.trim() && results.length === 0) handleAskAi();
+              if (e.key === 'Escape') handleClose();
+              if (e.key === 'Enter' && query.trim() && displayedResults.length === 0) handleAskAi();
             }}
             placeholder="Search decisions, systems, tickets, or ask 'Why did we...' (ESC to exit)"
             className="w-full bg-transparent border-none outline-none text-on-surface font-body-md text-sm placeholder:text-outline"
@@ -113,8 +121,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             </div>
           )}
 
-          {results.length > 0 ? (
-            results.map((res) => (
+          {displayedResults.length > 0 ? (
+            displayedResults.map((res) => (
               <div
                 key={res.id}
                 onClick={() => handleSelect(res)}

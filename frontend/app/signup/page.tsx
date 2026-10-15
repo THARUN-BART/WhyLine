@@ -36,6 +36,10 @@ export default function SignupPage() {
       setError('Please fill in all required fields including your company name.');
       return;
     }
+    if (password.trim().length < 12) {
+      setError('Password must be at least 12 characters long.');
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await api.sendOtp(email.trim());
@@ -192,7 +196,7 @@ export default function SignupPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Minimum 8 characters"
+                  placeholder="Minimum 12 characters"
                   className="mt-1.5 w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-outline-variant text-on-surface text-xs font-label-code-md outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-outline"
                 />
               </div>

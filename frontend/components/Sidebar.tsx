@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { WhylineLogo } from './WhylineLogo';
@@ -9,9 +9,8 @@ import { useTheme } from './ThemeContext';
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { currentUser, users, setCurrentUser, logoutUser, graphStats } = useUser();
+  const { currentUser, logoutUser, graphStats } = useUser();
   const { theme, toggleTheme } = useTheme();
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   const baseNavItems = [
     { label: 'Home', path: '/', icon: 'home' },

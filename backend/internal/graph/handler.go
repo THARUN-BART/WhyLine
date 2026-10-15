@@ -53,13 +53,13 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 	nodes, err := h.client.CountNodes(ctx, graphName)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to retrieve graph stats"})
 		return
 	}
 
 	edges, err := h.client.CountEdges(ctx, graphName)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to retrieve graph stats"})
 		return
 	}
 
@@ -72,6 +72,7 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleQuery(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // Fix #10: 1MB limit
 	ctx := r.Context()
 	var payload QueryPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -95,7 +96,7 @@ func (h *Handler) HandleQuery(w http.ResponseWriter, r *http.Request) {
 
 	res, err := h.client.Query(ctx, graphName, payload.Query, payload.Params)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "query execution failed"})
 		return
 	}
 
@@ -114,7 +115,7 @@ func (h *Handler) HandleReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.client.DeleteGraph(ctx, graphName); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to reset graph"})
 		return
 	}
 
