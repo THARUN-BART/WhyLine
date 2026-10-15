@@ -32,6 +32,7 @@ export function Header() {
     if (pathname.startsWith('/tickets')) return 'Tickets & Traces';
     if (pathname.startsWith('/rag-comparison')) return 'Vs-RAG Architecture Comparison';
     if (pathname.startsWith('/graph-explorer')) return 'Graph Explorer';
+    if (pathname.startsWith('/admin')) return 'Platform Administration & Tenancy';
     return 'Lineage';
   };
 

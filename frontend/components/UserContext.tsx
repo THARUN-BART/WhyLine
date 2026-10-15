@@ -1,16 +1,18 @@
-'use client';
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, api } from '@/lib/api';
+import { User, Company, api } from '@/lib/api';
 
 interface UserContextType {
   currentUser: User | null;
   users: User[];
+  companies: Company[];
   token: string | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   setCurrentUser: (user: User | null) => void;
   loginUser: (email: string, password: string) => Promise<void>;
   registerUser: (payload: { email: string; username: string; company: string; password: string; otp?: string }) => Promise<void>;
+  createCompany: (name: string) => Promise<Company>;
+  refreshCompanies: () => Promise<void>;
   logoutUser: () => void;
   graphStats: { total_nodes: number; total_edges: number } | null;
   refreshStats: () => Promise<void>;
@@ -19,11 +21,15 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   currentUser: null,
   users: [],
+  companies: [],
   token: null,
   isAuthenticated: false,
+  isAdmin: false,
   setCurrentUser: () => {},
   loginUser: async () => {},
   registerUser: async () => {},
+  createCompany: async () => ({ id: '', name: '', created_at: '' }),
+  refreshCompanies: async () => {},
   logoutUser: () => {},
   graphStats: null,
   refreshStats: async () => {},
@@ -33,6 +39,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [graphStats, setGraphStats] = useState<{ total_nodes: number; total_edges: number } | null>(null);
 
   const refreshStats = async () => {
@@ -43,6 +50,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       // fallback
+    }
+  };
+
+  const refreshCompanies = async () => {
+    try {
+      const res = await api.getCompanies();
+      if (res && res.companies) {
+        setCompanies(res.companies);
+      }
+    } catch {
+      // ignore
     }
   };
 
@@ -78,6 +96,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         // ignore
       }
       refreshStats();
+      refreshCompanies();
     }
     loadData();
   }, []);
@@ -93,19 +112,27 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    refreshCompanies();
   };
 
   const registerUser = async (payload: { email: string; username: string; company: string; password: string; otp?: string }) => {
     const res = await api.register(payload);
     setToken(res.token);
     setCurrentUser(res.user);
-    // Refresh user list from backend
+    // Refresh user list and companies from backend
     try {
       const usersRes = await api.getUsers();
       if (usersRes?.users) setUsers(usersRes.users);
     } catch {
       // ignore
     }
+    refreshCompanies();
+  };
+
+  const createCompany = async (name: string): Promise<Company> => {
+    const res = await api.createCompany(name);
+    await refreshCompanies();
+    return res.company;
   };
 
   const logoutUser = () => {
@@ -114,16 +141,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(null);
   };
 
+  const isAdmin = currentUser?.role === 'admin';
+
   return (
     <UserContext.Provider
       value={{
         currentUser,
         users,
+        companies,
         token,
         isAuthenticated: !!token,
+        isAdmin,
         setCurrentUser,
         loginUser,
         registerUser,
+        createCompany,
+        refreshCompanies,
         logoutUser,
         graphStats,
         refreshStats,

@@ -12,6 +12,12 @@ export interface User {
   active?: boolean;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
@@ -234,6 +240,27 @@ class ApiClient {
 
   async getHealth() {
     const res = await fetch(`${API_BASE}/health`);
+    return res.json();
+  }
+
+  async getCompanies(): Promise<{ total: number; companies: Company[] }> {
+    const res = await fetch(`${API_BASE}/api/auth/companies`);
+    if (!res.ok) {
+      return { total: 0, companies: [] };
+    }
+    return res.json();
+  }
+
+  async createCompany(name: string): Promise<{ message: string; company: Company }> {
+    const res = await fetch(`${API_BASE}/api/auth/companies`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create company' }));
+      throw new Error(err.error || 'Failed to create company');
+    }
     return res.json();
   }
 

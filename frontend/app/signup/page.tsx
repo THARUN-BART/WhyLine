@@ -9,7 +9,7 @@ import { useUser } from '@/components/UserContext';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { registerUser } = useUser();
+  const { registerUser, companies } = useUser();
 
   const [step, setStep] = useState<'details' | 'otp'>('details');
   const [email, setEmail] = useState('');
@@ -20,6 +20,12 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!company && companies.length > 0) {
+      setCompany(companies[0].name);
+    }
+  }, [companies, company]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,14 +144,27 @@ export default function SignupPage() {
                 <label className="block text-xs font-semibold text-on-surface uppercase font-label-edge">
                   Company / Organization *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="e.g. Stripe, Airbnb, Datadog"
-                  className="mt-1.5 w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-outline-variant text-on-surface text-xs font-label-code-md outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder:text-outline"
-                />
+                <div className="mt-1.5 relative">
+                  <select
+                    required
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-surface-container-low border border-outline-variant text-on-surface text-xs font-label-code-md outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer appearance-none pr-10"
+                  >
+                    <option value="" disabled>Select your company</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.name} className="bg-surface-container-lowest text-on-surface">
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined text-[18px] text-on-surface-variant absolute right-3 top-2.5 pointer-events-none">
+                    expand_more
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-on-surface-variant">
+                  Organizations are managed and verified by your platform administrator.
+                </p>
               </div>
 
               <div>

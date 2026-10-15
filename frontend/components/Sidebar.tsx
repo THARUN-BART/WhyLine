@@ -11,7 +11,7 @@ export function Sidebar() {
   const { currentUser, users, setCurrentUser, logoutUser, graphStats } = useUser();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  const navItems = [
+  const baseNavItems = [
     { label: 'Home', path: '/', icon: 'home' },
     { label: 'Ask Whyline', path: '/ask-whyline', icon: 'psychology', badge: 'AI' },
     { label: 'Tickets', path: '/tickets', icon: 'confirmation_number' },
@@ -21,6 +21,10 @@ export function Sidebar() {
     { label: 'Vs-RAG Comparison', path: '/rag-comparison', icon: 'compare_arrows' },
     { label: 'Graph Explorer', path: '/graph-explorer', icon: 'hub' },
   ];
+
+  const navItems = currentUser?.role === 'admin'
+    ? [...baseNavItems, { label: 'Admin Console', path: '/admin', icon: 'admin_panel_settings', badge: 'ROOT' }]
+    : baseNavItems;
 
   const totalNodes = graphStats?.total_nodes ?? 68;
   const totalEdges = graphStats?.total_edges ?? 58;
