@@ -12,6 +12,7 @@ import (
 
 	"github.com/THARUN-BART/whyline/backend/internal/auth"
 	"github.com/THARUN-BART/whyline/backend/internal/config"
+	"github.com/THARUN-BART/whyline/backend/internal/graph"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -22,13 +23,23 @@ func main() {
 
 	log.Printf("[INFO] Initializing Whyline Backend on port %s...", cfg.Port)
 
-	// Auth dependencies
-	authRepo := auth.NewMemoryRepository()
+	// 1. FalkorDB Graph Client initialization
+	var authRepo auth.Repository
+	graphClient, err := graph.NewClient(cfg.FalkorHost, cfg.FalkorPort, cfg.FalkorPass)
+	if err != nil {
+		log.Printf("[WARN] Could not connect to FalkorDB (%v). Falling back to in-memory user repository.", err)
+		authRepo = auth.NewMemoryRepository()
+	} else {
+		log.Println("[INFO] FalkorDB connected. Using FalkorDB for user storage and graph memory.")
+		authRepo = auth.NewFalkorRepository(graphClient, "company")
+	}
+
+	// 2. Auth dependencies
 	otpManager := auth.NewOTPManager(cfg.OTPExpiry, cfg.AppEmail, cfg.AppPassword, cfg.SMTPHost, cfg.SMTPPort)
 	authService := auth.NewService(authRepo, cfg.JWTSecret, cfg.JWTExpiry, otpManager)
 	authHandler := auth.NewHandler(authService)
 
-	// Router setup
+	// 3. Router setup
 	r := chi.NewRouter()
 
 	// Global middlewares
@@ -50,13 +61,24 @@ func main() {
 
 	// Health check endpoint
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		status := "ok"
+		graphStatus := "connected"
+		if graphClient == nil {
+			graphStatus = "disconnected"
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok","service":"whyline-backend"}`))
+		_, _ = fmt.Fprintf(w, `{"status":"%s","service":"whyline-backend","graph":"%s"}`, status, graphStatus)
 	})
 
 	// Mount Auth routes
 	authHandler.RegisterRoutes(r)
+
+	// Mount Graph routes (if connected)
+	if graphClient != nil {
+		graphHandler := graph.NewHandler(graphClient, "company")
+		graphHandler.RegisterRoutes(r)
+	}
 
 	// Protected test endpoint to verify JWT middleware
 	r.Group(func(r chi.Router) {
@@ -86,7 +108,6 @@ func main() {
 	go func() {
 		<-sig
 
-		// Shutdown signal with grace period of 10s
 		shutdownCtx, cancel := context.WithTimeout(serverCtx, 10*time.Second)
 		defer cancel()
 
@@ -98,6 +119,9 @@ func main() {
 		}()
 
 		log.Println("[INFO] Shutting down Whyline backend server...")
+		if graphClient != nil {
+			_ = graphClient.Close()
+		}
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Fatalf("[ERROR] Server shutdown failed: %v", err)
 		}
