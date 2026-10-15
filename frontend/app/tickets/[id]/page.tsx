@@ -32,6 +32,25 @@ export default function TicketDetailPage() {
   useEffect(() => {
     async function loadTicket() {
       try {
+        const ticket = await api.getTicketById(ticketId);
+        if (ticket) {
+          setTicketData((prev) => ({
+            ...prev,
+            id: ticket.id || ticketId,
+            title: ticket.title || prev.title,
+            url: ticket.url || prev.url,
+            priority: ticket.priority || prev.priority,
+            status: ticket.status || prev.status,
+            decision_id: ticket.decision_id || prev.decision_id,
+            decision_title: ticket.decision_title || prev.decision_title,
+          }));
+          return;
+        }
+      } catch {
+        // Fallback to Cypher graph query
+      }
+
+      try {
         const res = await api.queryGraph(
           `MATCH (t:Ticket {id: '${ticketId}'})
            OPTIONAL MATCH (d:Decision)-[:APPROVED_IN]->(t)

@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { WhylineLogo } from './WhylineLogo';
 import { useUser } from './UserContext';
+import { useTheme } from './ThemeContext';
 
 export function Sidebar() {
   const pathname = usePathname();
   const { currentUser, users, setCurrentUser, logoutUser, graphStats } = useUser();
+  const { theme, toggleTheme } = useTheme();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   const baseNavItems = [
@@ -22,9 +24,19 @@ export function Sidebar() {
     { label: 'Graph Explorer', path: '/graph-explorer', icon: 'hub' },
   ];
 
-  const navItems = currentUser?.role === 'admin'
-    ? [...baseNavItems, { label: 'Admin Console', path: '/admin', icon: 'admin_panel_settings', badge: 'ROOT' }]
-    : baseNavItems;
+  let navItems = baseNavItems;
+  if (currentUser?.role === 'admin') {
+    // Platform admin only sees Admin Console (no other screens)
+    navItems = [
+      { label: 'Admin Console', path: '/admin', icon: 'admin_panel_settings', badge: 'ROOT' },
+    ];
+  } else if (currentUser?.role === 'company_admin') {
+    // Company admin has full dashboard plus the extra Company Approvals screen
+    navItems = [
+      ...baseNavItems,
+      { label: 'Company Approvals', path: '/company-admin', icon: 'how_to_reg', badge: 'APPROVALS' },
+    ];
+  }
 
   const totalNodes = graphStats?.total_nodes ?? 68;
   const totalEdges = graphStats?.total_edges ?? 58;
@@ -39,7 +51,7 @@ export function Sidebar() {
       <div className="flex flex-col min-h-0">
         {/* Header Logo */}
         <div className="px-space-lg pt-space-lg pb-space-md flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-space-sm">
+          <Link href={currentUser?.role === 'admin' ? '/admin' : '/'} className="flex items-center gap-space-sm">
             <WhylineLogo className="h-7 w-auto" />
           </Link>
           <span className="font-label-code-sm text-label-code-sm bg-surface-container px-space-xs py-space-2xs rounded text-primary font-medium tracking-wide">
@@ -151,13 +163,24 @@ export function Sidebar() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={logoutUser}
-              title="Sign Out"
-              className="p-1.5 rounded-md hover:bg-surface-container-high text-on-surface-variant hover:text-error transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">logout</span>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                className="p-1.5 rounded-md hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+                </span>
+              </button>
+              <button
+                onClick={logoutUser}
+                title="Sign Out"
+                className="p-1.5 rounded-md hover:bg-surface-container-high text-on-surface-variant hover:text-error transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">logout</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-2">

@@ -5,6 +5,14 @@ import { AppShell } from "@/components/AppShell";
 export const metadata: Metadata = {
   title: "Whyline — Technical Lineage & Decision Memory",
   description: "Understand decisions. Trace their reasoning. Change systems safely.",
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({

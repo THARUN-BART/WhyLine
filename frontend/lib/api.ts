@@ -7,6 +7,7 @@ export interface User {
   name?: string;
   company?: string;
   role: string;
+  approval_status?: string;
   is_verified?: boolean;
   created_at?: string;
   active?: boolean;
@@ -15,7 +16,32 @@ export interface User {
 export interface Company {
   id: string;
   name: string;
+  user_count?: number;
   created_at: string;
+}
+
+export interface CompanyStats {
+  company: string;
+  user_count: number;
+  approved_count: number;
+  pending_count: number;
+  rejected_count: number;
+}
+
+export interface Ticket {
+  id: string;
+  title: string;
+  description?: string;
+  url?: string;
+  priority?: string;
+  status?: string;
+  company?: string;
+  created_by?: string;
+  created_at?: string;
+  decision_id?: string;
+  decision_title?: string;
+  system_id?: string;
+  system_name?: string;
 }
 
 export interface AuthResponse {
@@ -345,6 +371,139 @@ class ApiClient {
       headers: this.getHeaders(userId),
       body: JSON.stringify({ prompt, user_id: userId }),
     });
+    return res.json();
+  }
+
+  // --- Multi-Company Administration & Approval Endpoints ---
+
+  async adminCreateUser(payload: {
+    company_name: string;
+    email: string;
+    username: string;
+    password: string;
+    role?: string;
+  }): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE}/api/auth/admin/create-user`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create user' }));
+      throw new Error(err.error || 'Failed to create company and user');
+    }
+    return res.json();
+  }
+
+  async getCompanyStats(company?: string): Promise<CompanyStats> {
+    const url = company
+      ? `${API_BASE}/api/auth/company/stats?company=${encodeURIComponent(company)}`
+      : `${API_BASE}/api/auth/company/stats`;
+    const res = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to fetch company stats' }));
+      throw new Error(err.error || 'Failed to fetch company stats');
+    }
+    return res.json();
+  }
+
+  async getCompanyEmployees(status?: string): Promise<{ total: number; employees: User[] }> {
+    const url = status
+      ? `${API_BASE}/api/auth/company/employees?status=${encodeURIComponent(status)}`
+      : `${API_BASE}/api/auth/company/employees`;
+    const res = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to fetch employees' }));
+      throw new Error(err.error || 'Failed to fetch company employees');
+    }
+    return res.json();
+  }
+
+  async approveUser(userId: string, status: 'approved' | 'rejected'): Promise<{ message: string; user: User }> {
+    const res = await fetch(`${API_BASE}/api/auth/company/approve-user`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ user_id: userId, status }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update approval status' }));
+      throw new Error(err.error || 'Failed to update user approval status');
+    }
+    return res.json();
+  }
+
+  async getDashboardStatus(): Promise<{ status: string; message: string; company?: string }> {
+    const res = await fetch(`${API_BASE}/api/dashboard/status`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Dashboard access denied' }));
+      throw new Error(err.error || 'Access forbidden');
+    }
+    return res.json();
+  }
+
+  // --- Engineering Tickets API Endpoints ---
+
+  async createTicket(payload: {
+    title: string;
+    description?: string;
+    url?: string;
+    priority?: string;
+    status?: string;
+    decision_id?: string;
+    system_id?: string;
+  }): Promise<Ticket> {
+    const res = await fetch(`${API_BASE}/api/tickets`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to create ticket' }));
+      throw new Error(err.error || 'Failed to create ticket');
+    }
+    return res.json();
+  }
+
+  async getTickets(company?: string): Promise<{ total: number; tickets: Ticket[] }> {
+    const url = company
+      ? `${API_BASE}/api/tickets?company=${encodeURIComponent(company)}`
+      : `${API_BASE}/api/tickets`;
+    const res = await fetch(url, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      return { total: 0, tickets: [] };
+    }
+    return res.json();
+  }
+
+  async getTicketById(id: string): Promise<Ticket> {
+    const res = await fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}`, {
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Ticket not found' }));
+      throw new Error(err.error || 'Ticket not found');
+    }
+    return res.json();
+  }
+
+  async updateTicket(id: string, payload: Partial<Ticket>): Promise<Ticket> {
+    const res = await fetch(`${API_BASE}/api/tickets/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to update ticket' }));
+      throw new Error(err.error || 'Failed to update ticket');
+    }
     return res.json();
   }
 }

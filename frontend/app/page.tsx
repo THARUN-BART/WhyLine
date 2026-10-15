@@ -8,16 +8,26 @@ import { useUser } from '@/components/UserContext';
 
 export default function HomePage() {
   const router = useRouter();
-  const { currentUser, graphStats } = useUser();
+  const { currentUser, graphStats, refreshCurrentUser } = useUser();
   const [decisions, setDecisions] = useState<any[]>([]);
   const [busFactor, setBusFactor] = useState<BusFactorReport | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | 'arch' | 'infra' | 'deprec'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<EntitySearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      router.replace('/admin');
+    }
+  }, [currentUser, router]);
 
   useEffect(() => {
     async function loadData() {
+      if (currentUser?.approval_status === 'pending') {
+        return;
+      }
       try {
         // Fetch decisions from FalkorDB with accurate decider and affected system links
         const dRes = await api.queryGraph(
@@ -45,7 +55,7 @@ export default function HomePage() {
     }
 
     loadData();
-  }, []);
+  }, [currentUser]);
 
   const handleQuickSearch = async (val: string) => {
     setSearchQuery(val);
@@ -63,6 +73,66 @@ export default function HomePage() {
       setIsSearching(false);
     }
   };
+
+  const handleCheckApproval = async () => {
+    setIsRefreshingStatus(true);
+    try {
+      const updated = await refreshCurrentUser();
+      if (updated?.approval_status === 'approved') {
+        window.location.reload();
+      }
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  };
+
+  if (currentUser?.role === 'admin') {
+    return (
+      <main className="flex-1 flex items-center justify-center p-8">
+        <p className="text-on-surface-variant font-label-code-sm">Redirecting to Admin Console...</p>
+      </main>
+    );
+  }
+
+  if (currentUser?.approval_status === 'pending') {
+    return (
+      <main className="flex-1 max-w-4xl mx-auto p-space-xl flex flex-col items-center justify-center min-h-[70vh] text-center">
+        <div className="p-8 rounded-2xl bg-surface-container-lowest border border-outline-variant/40 shadow-xl max-w-xl flex flex-col items-center">
+          <div className="w-16 h-16 rounded-2xl bg-secondary-fixed/50 flex items-center justify-center text-secondary mb-4">
+            <span className="material-symbols-outlined text-3xl">hourglass_top</span>
+          </div>
+          <span className="font-label-edge text-label-edge uppercase font-bold tracking-widest text-secondary bg-secondary-fixed px-2 py-0.5 rounded mb-2">
+            REGISTRATION PENDING APPROVAL
+          </span>
+          <h1 className="font-headline-xl text-2xl font-bold text-on-surface">
+            Waiting for Company Approval
+          </h1>
+          <p className="font-body-md text-on-surface-variant text-sm mt-3 leading-relaxed">
+            Your account has been registered under <strong>{currentUser.company || 'your selected organization'}</strong>.
+            Before you can access the institutional reasoning graph and engineering dashboard, your company main administrator must approve your registration.
+          </p>
+          <div className="mt-6 flex flex-col sm:flex-row items-center gap-3">
+            <button
+              onClick={handleCheckApproval}
+              disabled={isRefreshingStatus}
+              className="px-6 py-2.5 rounded-lg bg-primary text-on-primary font-bold text-xs shadow hover:bg-surface-tint transition-all flex items-center gap-2"
+            >
+              <span className={`material-symbols-outlined text-sm ${isRefreshingStatus ? 'animate-spin' : ''}`}>
+                refresh
+              </span>
+              <span>{isRefreshingStatus ? 'Checking...' : 'Check Approval Status'}</span>
+            </button>
+            <Link
+              href="/login"
+              className="px-6 py-2.5 rounded-lg bg-surface-container text-on-surface font-semibold text-xs border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
+            >
+              Sign In with Another Account
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const orphanedSystem = busFactor?.orphaned_systems?.[0];
   const totalSystemsCount = busFactor?.total_systems ?? 10;

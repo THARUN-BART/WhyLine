@@ -8,11 +8,15 @@ interface UserContextType {
   token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isCompanyAdmin: boolean;
+  isPending: boolean;
+  authInitialized: boolean;
   setCurrentUser: (user: User | null) => void;
-  loginUser: (email: string, password: string) => Promise<void>;
+  loginUser: (email: string, password: string) => Promise<User>;
   registerUser: (payload: { email: string; username: string; company: string; password: string; otp?: string }) => Promise<void>;
   createCompany: (name: string) => Promise<Company>;
   refreshCompanies: () => Promise<void>;
+  refreshCurrentUser: () => Promise<User | null>;
   logoutUser: () => void;
   graphStats: { total_nodes: number; total_edges: number } | null;
   refreshStats: () => Promise<void>;
@@ -25,11 +29,15 @@ const UserContext = createContext<UserContextType>({
   token: null,
   isAuthenticated: false,
   isAdmin: false,
+  isCompanyAdmin: false,
+  isPending: false,
+  authInitialized: false,
   setCurrentUser: () => {},
-  loginUser: async () => {},
+  loginUser: async () => ({ id: '', email: '', role: '' }),
   registerUser: async () => {},
   createCompany: async () => ({ id: '', name: '', created_at: '' }),
   refreshCompanies: async () => {},
+  refreshCurrentUser: async () => null,
   logoutUser: () => {},
   graphStats: null,
   refreshStats: async () => {},
@@ -38,6 +46,7 @@ const UserContext = createContext<UserContextType>({
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [graphStats, setGraphStats] = useState<{ total_nodes: number; total_edges: number } | null>(null);
@@ -81,6 +90,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
+    setAuthInitialized(true);
 
     async function loadData() {
       try {
@@ -97,10 +107,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, []);
 
-  const loginUser = async (email: string, password: string) => {
+  const loginUser = async (email: string, password: string): Promise<User> => {
     const res = await api.login({ email, password });
     setToken(res.token);
     setCurrentUser(res.user);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('whyline_token', res.token);
+      localStorage.setItem('whyline_user', JSON.stringify(res.user));
+    }
     // Refresh user list from backend
     try {
       const usersRes = await api.getUsers();
@@ -109,6 +123,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     refreshCompanies();
+    return res.user;
   };
 
   const registerUser = async (payload: { email: string; username: string; company: string; password: string; otp?: string }) => {
@@ -131,6 +146,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return res.company;
   };
 
+  const refreshCurrentUser = async (): Promise<User | null> => {
+    try {
+      const user = await api.getMe(token || undefined);
+      if (user) {
+        setCurrentUser(user);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('whyline_user', JSON.stringify(user));
+        }
+        return user;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
   const logoutUser = () => {
     api.logout();
     setToken(null);
@@ -138,6 +169,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isAdmin = currentUser?.role === 'admin';
+  const isCompanyAdmin = currentUser?.role === 'company_admin';
+  const isPending = currentUser?.approval_status === 'pending';
 
   return (
     <UserContext.Provider
@@ -148,11 +181,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         token,
         isAuthenticated: !!token,
         isAdmin,
+        isCompanyAdmin,
+        isPending,
+        authInitialized,
         setCurrentUser,
         loginUser,
         registerUser,
         createCompany,
         refreshCompanies,
+        refreshCurrentUser,
         logoutUser,
         graphStats,
         refreshStats,

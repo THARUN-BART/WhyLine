@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUser } from './UserContext';
+import { useTheme } from './ThemeContext';
 import { CommandPalette } from './CommandPalette';
 
 export function Header() {
   const pathname = usePathname();
   const { currentUser } = useUser();
+  const { theme, toggleTheme } = useTheme();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -23,9 +25,13 @@ export function Header() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const isAdmin = currentUser?.role === 'admin';
+
   const getPageTitle = () => {
+    if (isAdmin) return 'Platform Administration & Tenancy';
     if (pathname === '/') return 'Acme Architecture Lineage';
     if (pathname.startsWith('/ask-whyline')) return 'AI Investigation';
+    if (pathname.startsWith('/company-admin')) return 'Company Approvals & Tenant Management';
     if (pathname.startsWith('/decisions')) return 'Decisions & Provenance';
     if (pathname.startsWith('/impact-analysis')) return 'Change Impact Analysis';
     if (pathname.startsWith('/ownership-bus-factor')) return 'Ownership & Bus Factor';
@@ -42,7 +48,7 @@ export function Header() {
         {/* Breadcrumb title */}
         <div className="flex items-center gap-space-sm">
           <div className="flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
-            <Link href="/" className="hover:text-on-surface transition-colors cursor-pointer font-medium">
+            <Link href={isAdmin ? '/admin' : '/'} className="hover:text-on-surface transition-colors cursor-pointer font-medium">
               {currentUser?.company || 'Whyline'}
             </Link>
             <span>/</span>
@@ -52,78 +58,104 @@ export function Header() {
           </div>
         </div>
 
-        {/* Global Search Bar */}
-        <div className="flex items-center justify-center flex-1 max-w-xl mx-space-xl">
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center justify-between px-space-md py-space-xs rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-colors shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-          >
-            <div className="flex items-center gap-space-sm text-on-surface-variant">
-              <span className="material-symbols-outlined text-[18px]">search</span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Search decisions, systems, tickets, or ask &apos;Why...&apos;
-              </span>
-            </div>
-            <kbd className="font-label-code-sm text-label-code-sm bg-surface-container-highest text-on-surface px-space-xs py-space-2xs rounded shadow-sm">
-              ⌘K
-            </kbd>
-          </button>
-        </div>
+        {/* Global Search Bar (hidden for admin) */}
+        {!isAdmin ? (
+          <div className="flex items-center justify-center flex-1 max-w-xl mx-space-xl">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="w-full flex items-center justify-between px-space-md py-space-xs rounded-lg bg-surface-container-low text-on-surface-variant hover:bg-surface-container transition-colors shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+            >
+              <div className="flex items-center gap-space-sm text-on-surface-variant">
+                <span className="material-symbols-outlined text-[18px]">search</span>
+                <span className="font-body-sm text-body-sm text-on-surface-variant">
+                  Search decisions, systems, tickets, or ask &apos;Why...&apos;
+                </span>
+              </div>
+              <kbd className="font-label-code-sm text-label-code-sm bg-surface-container-highest text-on-surface px-space-xs py-space-2xs rounded shadow-sm">
+                ⌘K
+              </kbd>
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 max-w-xl mx-space-xl text-center">
+            <span className="font-label-code-sm text-xs text-on-surface-variant uppercase tracking-wider bg-surface-container px-3 py-1 rounded-full border border-outline-variant/30">
+              Admin Mode • Users &amp; Companies Only
+            </span>
+          </div>
+        )}
 
         {/* Action Controls & Badges */}
         <div className="flex items-center gap-space-md">
-          {/* Provenance Badge */}
-          <div className="hidden lg:flex items-center gap-space-xs px-space-sm py-space-xs rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-edge text-label-edge tracking-wider uppercase font-bold">
-            <span className="material-symbols-outlined text-[14px]">verified</span>
-            <span>Graph-backed • 100% Provenance</span>
-          </div>
+          {/* Provenance Badge (hidden for platform admin) */}
+          {!isAdmin && (
+            <div className="hidden lg:flex items-center gap-space-xs px-space-sm py-space-xs rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-edge text-label-edge tracking-wider uppercase font-bold">
+              <span className="material-symbols-outlined text-[14px]">verified</span>
+              <span>Graph-backed • 100% Provenance</span>
+            </div>
+          )}
 
-          {/* Notifications Button */}
-          <div className="relative">
-            <button
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative p-space-xs text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors"
+          {/* Notifications Button (hidden for platform admin) */}
+          {!isAdmin && (
+            <div className="relative">
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="relative p-space-xs text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">notifications</span>
+                <span className="absolute top-1 right-1 w-4 h-4 bg-error text-on-error rounded-full font-label-edge text-label-edge flex items-center justify-center leading-none">
+                  3
+                </span>
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl p-3 z-50 animate-in fade-in">
+                  <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
+                    <span className="font-headline-sm text-xs text-on-surface font-semibold">Active Risk Alerts</span>
+                    <span className="text-[10px] bg-error-container text-on-error-container px-1.5 py-0.5 rounded font-label-edge">
+                      3 High
+                    </span>
+                  </div>
+                  <div className="py-2 space-y-2 text-xs">
+                    <div className="p-2 rounded bg-error-container/40 border border-error/20">
+                      <p className="font-semibold text-error">ledger-service ORPHANED</p>
+                      <p className="text-on-surface-variant text-[11px]">Former owner Dave Miller departed. 5 transitive dependents.</p>
+                    </div>
+                    <div className="p-2 rounded bg-surface-container">
+                      <p className="font-semibold text-on-surface">payments-gateway Single Owner</p>
+                      <p className="text-on-surface-variant text-[11px]">Bus factor 1 with 5 dependent services.</p>
+                    </div>
+                    <div className="p-2 rounded bg-surface-container">
+                      <p className="font-semibold text-on-surface">Protobuf RFC Document Missing</p>
+                      <p className="text-on-surface-variant text-[11px]">Provenanced gap detected on dec_gap_no_doc.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Ask AI / New Investigation Link (hidden for platform admin) */}
+          {!isAdmin && (
+            <Link
+              href="/ask-whyline"
+              className="flex items-center gap-space-xs px-space-md py-space-xs bg-primary-container text-on-primary rounded-lg font-headline-sm text-headline-sm hover:bg-primary transition-colors shadow-sm"
             >
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-              <span className="absolute top-1 right-1 w-4 h-4 bg-error text-on-error rounded-full font-label-edge text-label-edge flex items-center justify-center leading-none">
-                3
-              </span>
-            </button>
+              <span className="material-symbols-outlined text-[16px]">psychology</span>
+              <span>Ask Whyline</span>
+            </Link>
+          )}
 
-            {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl p-3 z-50 animate-in fade-in">
-                <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
-                  <span className="font-headline-sm text-xs text-on-surface font-semibold">Active Risk Alerts</span>
-                  <span className="text-[10px] bg-error-container text-on-error-container px-1.5 py-0.5 rounded font-label-edge">
-                    3 High
-                  </span>
-                </div>
-                <div className="py-2 space-y-2 text-xs">
-                  <div className="p-2 rounded bg-error-container/40 border border-error/20">
-                    <p className="font-semibold text-error">ledger-service ORPHANED</p>
-                    <p className="text-on-surface-variant text-[11px]">Former owner Dave Miller departed. 5 transitive dependents.</p>
-                  </div>
-                  <div className="p-2 rounded bg-surface-container">
-                    <p className="font-semibold text-on-surface">payments-gateway Single Owner</p>
-                    <p className="text-on-surface-variant text-[11px]">Bus factor 1 with 5 dependent services.</p>
-                  </div>
-                  <div className="p-2 rounded bg-surface-container">
-                    <p className="font-semibold text-on-surface">Protobuf RFC Document Missing</p>
-                    <p className="text-on-surface-variant text-[11px]">Provenanced gap detected on dec_gap_no_doc.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Ask AI / New Investigation Link */}
-          <Link
-            href="/ask-whyline"
-            className="flex items-center gap-space-xs px-space-md py-space-xs bg-primary-container text-on-primary rounded-lg font-headline-sm text-headline-sm hover:bg-primary transition-colors shadow-sm"
+          {/* Dark / Light Mode Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="p-space-xs text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container-high transition-colors flex items-center justify-center border border-outline-variant/30"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme mode"
           >
-            <span className="material-symbols-outlined text-[16px]">psychology</span>
-            <span>Ask Whyline</span>
-          </Link>
+            <span className="material-symbols-outlined text-[18px]">
+              {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
 
           {/* User Avatar */}
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-xs shadow-sm">

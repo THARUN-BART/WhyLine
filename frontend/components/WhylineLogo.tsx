@@ -13,7 +13,7 @@ export function WhylineLogo({ className = 'h-8 w-auto' }: { className?: string }
         <path d="M 6 12 L 22 12" stroke="#6366F1" strokeWidth="1.5" strokeDasharray="2 2" />
         <circle cx="14" cy="12" r="1.5" fill="#FFFFFF" />
       </g>
-      <text x="36" y="21" fontFamily="Inter, -apple-system, sans-serif" fontWeight="700" fontSize="16" letterSpacing="-0.02em" fill="#0F172A">
+      <text x="36" y="21" fontFamily="Inter, -apple-system, sans-serif" fontWeight="700" fontSize="16" letterSpacing="-0.02em" fill="currentColor" className="text-on-surface">
         Whyline
       </text>
     </svg>

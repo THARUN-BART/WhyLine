@@ -72,8 +72,8 @@
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #f8f9ff;
-    color: #0b1c30;
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   body {
@@ -87,12 +87,97 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #c7c4d8;
+    background: var(--color-outline-variant);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #777587;
+    background: var(--color-outline);
   }
+}
+
+.dark, [data-theme="dark"], html.dark {
+  --color-surface: #090d16;
+  --color-surface-dim: #060910;
+  --color-surface-bright: #131a29;
+  --color-surface-variant: #1a2233;
+  --color-surface-tint: #818cf8;
+  --color-surface-container-lowest: #0d131f;
+  --color-surface-container-low: #121927;
+  --color-surface-container: #172033;
+  --color-surface-container-high: #1e2a42;
+  --color-surface-container-highest: #283652;
+  --color-on-surface: #f8fafc;
+  --color-on-surface-variant: #cbd5e1;
+  --color-inverse-surface: #f1f5f9;
+  --color-inverse-on-surface: #0f172a;
+
+  --color-background: #090d16;
+  --color-on-background: #f8fafc;
+
+  --color-outline: #64748b;
+  --color-outline-variant: #283652;
+
+  --color-primary: #818cf8;
+  --color-primary-container: #4f46e5;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #e0e7ff;
+  --color-primary-fixed: #1e1b4b;
+  --color-primary-fixed-dim: #312e81;
+  --color-on-primary-fixed: #c7d2fe;
+  --color-on-primary-fixed-variant: #a5b4fc;
+  --color-inverse-primary: #3730a3;
+
+  --color-secondary: #22d3ee;
+  --color-secondary-container: #0891b2;
+  --color-on-secondary: #000000;
+  --color-on-secondary-container: #ecfeff;
+  --color-secondary-fixed: #083344;
+  --color-secondary-fixed-dim: #164e63;
+  --color-on-secondary-fixed: #bae6fd;
+  --color-on-secondary-fixed-variant: #7dd3fc;
+
+  --color-tertiary: #fbbf24;
+  --color-tertiary-container: #d97706;
+  --color-on-tertiary: #000000;
+  --color-on-tertiary-container: #fffbeb;
+  --color-tertiary-fixed: #451a03;
+  --color-tertiary-fixed-dim: #78350f;
+  --color-on-tertiary-fixed: #fde68a;
+  --color-on-tertiary-fixed-variant: #fcd34d;
+
+  --color-error: #f87171;
+  --color-error-container: #450a0a;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #fecaca;
+}
+
+/* Ensure inputs, selects, textareas have crisp readable text in dark mode */
+.dark input,
+.dark select,
+.dark textarea,
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  color: #f8fafc !important;
+  background-color: #121927;
+}
+
+.dark select option,
+[data-theme="dark"] select option {
+  background-color: #121927 !important;
+  color: #f8fafc !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.dark code,
+[data-theme="dark"] code {
+  color: #a5b4fc;
 }
 
 @layer utilities {

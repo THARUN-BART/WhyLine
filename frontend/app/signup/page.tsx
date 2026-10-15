@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { WhylineLogo } from '@/components/WhylineLogo';
 import { api } from '@/lib/api';
 import { useUser } from '@/components/UserContext';
+import { useTheme } from '@/components/ThemeContext';
 
 export default function SignupPage() {
   const router = useRouter();
   const { registerUser, companies } = useUser();
+  const { theme, toggleTheme } = useTheme();
 
   const [step, setStep] = useState<'details' | 'otp'>('details');
   const [email, setEmail] = useState('');
@@ -74,6 +76,20 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Top right theme toggle */}
+      <div className="absolute top-6 right-6 z-20">
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline-variant/30 transition-colors shadow-sm flex items-center gap-1.5 text-xs font-semibold"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          <span className="material-symbols-outlined text-[18px]">
+            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+          </span>
+          <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+        </button>
+      </div>
+
       {/* Background ambient glowing spheres */}
       <div className="absolute -left-20 -top-20 w-96 h-96 bg-primary-fixed/20 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-secondary-fixed/20 rounded-full blur-3xl pointer-events-none"></div>
