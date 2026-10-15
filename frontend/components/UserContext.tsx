@@ -93,16 +93,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setAuthInitialized(true);
 
     async function loadData() {
-      try {
-        const res = await api.getUsers();
-        if (res && res.users && res.users.length > 0) {
-          setUsers(res.users);
-        }
-      } catch {
-        // ignore
-      }
-      refreshStats();
+      // Always refresh companies for signup dropdown
       refreshCompanies();
+
+      // Only fetch users list and graph stats if an authenticated session exists
+      if (savedToken) {
+        try {
+          const res = await api.getUsers();
+          if (res && res.users && res.users.length > 0) {
+            setUsers(res.users);
+          }
+        } catch {
+          // ignore
+        }
+        refreshStats();
+      }
     }
     loadData();
   }, []);

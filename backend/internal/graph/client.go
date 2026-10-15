@@ -18,6 +18,10 @@ type Client struct {
 }
 
 func NewClient(host, port, password string) (*Client, error) {
+	return NewClientWithAuth(host, port, "", password, false)
+}
+
+func NewClientWithAuth(host, port, username, password string, useTLS bool) (*Client, error) {
 	addr := fmt.Sprintf("%s:%s", host, port)
 
 	pool := &redis.Pool{
@@ -30,8 +34,14 @@ func NewClient(host, port, password string) (*Client, error) {
 			opts = append(opts, redis.DialReadTimeout(10*time.Second))
 			opts = append(opts, redis.DialWriteTimeout(5*time.Second))
 
+			if username != "" {
+				opts = append(opts, redis.DialUsername(username))
+			}
 			if password != "" {
 				opts = append(opts, redis.DialPassword(password))
+			}
+			if useTLS {
+				opts = append(opts, redis.DialUseTLS(true), redis.DialTLSSkipVerify(true))
 			}
 
 			c, err := redis.Dial("tcp", addr, opts...)
@@ -57,7 +67,7 @@ func NewClient(host, port, password string) (*Client, error) {
 		return nil, fmt.Errorf("failed to ping FalkorDB at %s: %w", addr, err)
 	}
 
-	log.Printf("[INFO] Successfully connected to FalkorDB at %s", addr)
+	log.Printf("[INFO] Successfully connected to FalkorDB at %s (tls=%v, user=%s)", addr, useTLS, username)
 	return &Client{pool: pool}, nil
 }
 

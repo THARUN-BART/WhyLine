@@ -30,14 +30,19 @@ func main() {
 	log.Printf("[INFO] Initializing Whyline Backend on port %s...", cfg.Port)
 
 	// 1. FalkorDB Graph Client initialization
+	graphName := cfg.FalkorGraph
+	if graphName == "" {
+		graphName = "company"
+	}
+
 	var authRepo auth.Repository
-	graphClient, err := graph.NewClient(cfg.FalkorHost, cfg.FalkorPort, cfg.FalkorPass)
+	graphClient, err := graph.NewClientWithAuth(cfg.FalkorHost, cfg.FalkorPort, cfg.FalkorUser, cfg.FalkorPass, cfg.FalkorTLS)
 	if err != nil {
 		log.Printf("[WARN] Could not connect to FalkorDB (%v). Falling back to in-memory user repository.", err)
 		authRepo = auth.NewMemoryRepository()
 	} else {
-		log.Println("[INFO] FalkorDB connected. Using FalkorDB for user storage and graph memory.")
-		authRepo = auth.NewFalkorRepository(graphClient, "company")
+		log.Printf("[INFO] FalkorDB connected. Using FalkorDB graph '%s' for user storage and institutional memory.", graphName)
+		authRepo = auth.NewFalkorRepository(graphClient, graphName)
 	}
 
 	// 2. Auth dependencies
@@ -81,7 +86,7 @@ func main() {
 	authHandler.RegisterRoutes(r)
 
 	// Mount Graph, Tool, Ticket, and Memory routes (if connected)
-	ticketService := ticket.NewService(graphClient, "company")
+	ticketService := ticket.NewService(graphClient, graphName)
 	ticketHandler := ticket.NewHandler(ticketService)
 	ticketHandler.RegisterRoutes(r, authService.Middleware, authService.ApprovedUserMiddleware)
 
@@ -91,18 +96,18 @@ func main() {
 		r.Group(func(sub chi.Router) {
 			sub.Use(authService.OptionalApprovedUserMiddleware)
 
-			graphHandler := graph.NewHandler(graphClient, "company")
+			graphHandler := graph.NewHandler(graphClient, graphName)
 			graphHandler.RegisterRoutes(sub)
 
-			toolsEngine := tools.NewEngine(graphClient, "company")
+			toolsEngine := tools.NewEngine(graphClient, graphName)
 			toolsHandler := tools.NewHandler(toolsEngine)
 			toolsHandler.RegisterRoutes(sub)
 
-			memoryService := memory.NewService(graphClient, "company", toolsEngine)
+			memoryService := memory.NewService(graphClient, graphName, toolsEngine)
 			memoryHandler := memory.NewHandler(memoryService)
 			memoryHandler.RegisterRoutes(sub)
 
-			validator := agent.NewIDValidator(graphClient, "company")
+			validator := agent.NewIDValidator(graphClient, graphName)
 			geminiAgent := agent.NewGeminiAgent(cfg.GeminiKey, cfg.GeminiModel, toolsEngine, memoryService, validator)
 			agentHandler := agent.NewHandler(geminiAgent)
 			agentHandler.RegisterRoutes(sub)
@@ -114,7 +119,7 @@ func main() {
 			ragHandler.RegisterRoutes(sub)
 		})
 
-		seeder := seed.NewSeeder(graphClient, "company")
+		seeder := seed.NewSeeder(graphClient, graphName)
 		_ = seeder.CheckAndAutoSeed(context.Background())
 		seedHandler := seed.NewHandler(seeder)
 		seedHandler.RegisterRoutes(r)
