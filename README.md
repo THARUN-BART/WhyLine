@@ -322,6 +322,7 @@ To access the Platform Admin Console (`/admin`):
 ## 9. Documentation Index
 
 For deep-dive technical specifications, refer to the dedicated companion guides:
+- 🚀 **[Setup Guide (setup.md)](file:///home/bart-simpson/Whyline/setup.md)** — Complete Docker/Podman, FalkorDB Cypher, environment, and run guide.
 - 📘 **[Architecture Guide (architecture.md)](file:///home/bart-simpson/Whyline/architecture.md)** — Architectural design, system boundaries, and graph invariants.
 - 💡 **[Product Vision (idea.md)](file:///home/bart-simpson/Whyline/idea.md)** — Original hackathon idea, problem formulation, and formulas.
 - 🔌 **[Backend Endpoints Reference (backend/ENDPOINTS.md)](file:///home/bart-simpson/Whyline/backend/ENDPOINTS.md)** — Exhaustive 700+ line REST & SSE API specification.
