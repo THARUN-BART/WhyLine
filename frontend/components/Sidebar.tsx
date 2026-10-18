@@ -53,9 +53,6 @@ export function Sidebar() {
           <Link href={currentUser?.role === 'admin' ? '/admin' : '/'} className="flex items-center gap-space-sm">
             <WhylineLogo className="h-7 w-auto" />
           </Link>
-          <span className="font-label-code-sm text-label-code-sm bg-surface-container px-space-xs py-space-2xs rounded text-primary font-medium tracking-wide">
-            v2.4-prod
-          </span>
         </div>
 
         {/* Organization Box */}

@@ -58,8 +58,8 @@ RETURN s.id AS system_id,
 // FalkorDB explicitly proves absence of (:Document) node.
 // ------------------------------------------------------------------------------
 MATCH (d:Decision {id: 'dec_gap_no_doc'})
-OPTIONAL MATCH (d)-[:RECORDED_IN]->(t:Ticket)
-OPTIONAL MATCH (d)-[:DISCUSSED_IN]->(th:Thread)
+OPTIONAL MATCH (d)-[:APPROVED_IN]->(t:Ticket)
+OPTIONAL MATCH (t)-[:DISCUSSED_IN]->(th:Thread)
 OPTIONAL MATCH (d)-[:SUMMARIZED_IN]->(doc:Document)
 RETURN d.id AS decision_id,
        d.title AS title,

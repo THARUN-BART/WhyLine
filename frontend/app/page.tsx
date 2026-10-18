@@ -152,7 +152,7 @@ export default function HomePage() {
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
               <span className="font-label-code-sm text-label-code-sm text-on-surface-variant">
-                Live FalkorDB • v2.4-prod
+                Live FalkorDB
               </span>
             </div>
             <h1 className="font-headline-xl text-headline-xl text-on-surface tracking-tight">
